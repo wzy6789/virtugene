@@ -1,6 +1,7 @@
 {
   "name": "virtugene",
   "version": "1.0.0",
+  "type": "module",
   "description": "Unlock Your Digital Soul",
   "main": "dist-electron/main.js",
   "scripts": {
