@@ -1,0 +1,30 @@
+appId: com.virtugene.app
+productName: VirtuGene
+copyright: Copyright © 2025 VirtuGene
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - dist-electron/**/*
+  - dist/renderer/**/*
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-Setup-${version}-win.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  artifactName: ${productName}-${version}-mac.${ext}
+  category: public.app-category.productivity
