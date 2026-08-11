@@ -100,7 +100,7 @@ export function RegisterCard({ onSwitch }: Props) {
     <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-8 w-full max-w-md space-y-4">
       <div className="text-center">
         <div className="text-4xl mb-2">🌱</div>
-        <h2 className="text-2xl font-bold text-white">播种你的基因序列</h2>
+        <h2 className="text-2xl font-bold text-white">注册你的基因</h2>
         <p className="text-sm text-gray-400 mt-1">创建账号并绑定 DeepSeek API Key</p>
       </div>
 

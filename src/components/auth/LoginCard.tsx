@@ -29,7 +29,7 @@ export function LoginCard({ onSwitch }: Props) {
     try {
       const user = await userRepo.findByUsername(username.trim());
       if (!user) {
-        setError('用户名不存在，请先播种你的基因序列');
+        setError('用户名不存在，请先注册你的基因');
         return;
       }
 
@@ -96,7 +96,7 @@ export function LoginCard({ onSwitch }: Props) {
       <p className="text-center text-sm text-gray-400">
         尚无基因序列？{' '}
         <button type="button" onClick={onSwitch} className="text-life-cyan hover:underline">
-          播种你的基因序列
+          注册你的基因
         </button>
       </p>
     </form>
