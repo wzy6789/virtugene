@@ -9,7 +9,7 @@ const mainConfig = {
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  outfile: 'dist-electron/main.js',
+  outfile: 'dist-electron/main.cjs',
   external: ['electron'],
 };
 
@@ -20,7 +20,7 @@ const preloadConfig = {
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  outfile: 'dist-electron/preload.js',
+  outfile: 'dist-electron/preload.cjs',
   external: ['electron'],
 };
 

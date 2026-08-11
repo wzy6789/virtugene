@@ -7,28 +7,30 @@ const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged;
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    width: 320,
+    height: 466,
+    resizable: false,
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#0F0F1A',
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
   });
 
+  // Disable maximize button when in compact mode
+  win.setMaximizable(false);
+
   win.once('ready-to-show', () => {
     win.show();
   });
 
   if (isDev) {
-    win.loadURL('http://localhost:5173');
+    loadDevServer(win, 'http://localhost:5173');
   } else {
     win.loadFile(path.join(__dirname, '../dist/renderer/index.html'));
   }
@@ -36,11 +38,35 @@ function createWindow() {
   return win;
 }
 
+function loadDevServer(win: BrowserWindow, url: string, retries = 10) {
+  win.loadURL(url).catch(() => {
+    if (retries > 0) {
+      setTimeout(() => loadDevServer(win, url, retries - 1), 1000);
+    }
+  });
+}
+
 app.whenReady().then(() => {
   registerKeyIPC();
   registerShellIPC();
 
   const win = createWindow();
+
+  // Resize window — expand after login, shrink after logout
+  ipcMain.handle('window:setSize', (_event, { width, height }: { width: number; height: number }) => {
+    if (width >= 900) {
+      win.setMinimumSize(900, 600);
+      win.setResizable(true);
+      win.setMaximizable(true);
+    } else {
+      win.setMinimumSize(0, 0);
+      win.setResizable(false);
+      win.setMaximizable(false);
+    }
+    win.setSize(width, height);
+    win.center();
+    return true;
+  });
 
   ipcMain.on('window:minimize', () => win.minimize());
   ipcMain.on('window:maximize', () => {

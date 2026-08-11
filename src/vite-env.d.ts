@@ -15,6 +15,7 @@ interface VirtuGeneAPI {
     minimize: () => void;
     maximize: () => void;
     close: () => void;
+    setSize: (width: number, height: number) => Promise<boolean>;
   };
 }
 

@@ -19,7 +19,13 @@
       "Bash(git commit *)",
       "Bash(npm install *)",
       "Bash(node scripts/build-electron.mjs)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(npx kill-port *)",
+      "Bash(npx install-scripts *)",
+      "Bash(node node_modules/electron/install.js)",
+      "Bash(export ELECTRON_MIRROR=\"https://npmmirror.com/mirrors/electron/\")",
+      "Bash(unzip *)",
+      "Bash(xxd /f/VirtuGene/node_modules/electron/path.txt)"
     ]
   }
 }

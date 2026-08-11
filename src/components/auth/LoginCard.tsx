@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { ipc } from '../../lib/ipc-client';
-import { hashPassword } from '../../lib/crypto';
+import { hashPassword, decryptApiKey } from '../../lib/crypto';
 import { userRepo } from '../../db/user-repo';
-import { decryptApiKey } from '../../lib/crypto';
 import { useAuthStore } from '../../store/auth-store';
 
 interface Props {
@@ -33,7 +32,8 @@ export function LoginCard({ onSwitch }: Props) {
         return;
       }
 
-      const { hash } = await hashPassword(password);
+      const saltBytes = Uint8Array.from(atob(user.passwordSalt), (c) => c.charCodeAt(0));
+      const { hash } = await hashPassword(password, saltBytes);
       if (hash !== user.passwordHash) {
         setError('密码错误，基因序列不匹配');
         return;
@@ -43,10 +43,11 @@ export function LoginCard({ onSwitch }: Props) {
         user.apiKeyIv,
         user.apiKeyCiphertext,
         password,
-        Uint8Array.from(atob(user.passwordSalt), (c) => c.charCodeAt(0))
+        saltBytes
       );
 
       login(user.id, user.username, key);
+      ipc.window.setSize(1200, 800);
     } catch {
       setError('唤醒数字灵魂失败，请重试');
     } finally {
@@ -55,45 +56,46 @@ export function LoginCard({ onSwitch }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-8 w-full max-w-md space-y-5">
-      <div className="text-center">
-        <div className="text-4xl mb-2">🧬</div>
-        <h2 className="text-2xl font-bold text-white">唤醒数字灵魂</h2>
-        <p className="text-sm text-gray-400 mt-1">登录以继续你的基因探索</p>
+    <form onSubmit={handleSubmit} className="w-full space-y-5">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <div className="text-3xl">🧬</div>
+        <h2 className="text-lg font-semibold text-white">唤醒数字灵魂</h2>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 text-sm text-red-400">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400">
           {error}
         </div>
       )}
 
-      <div className="space-y-3">
+      {/* Inputs — WeChat bottom-border style */}
+      <div className="space-y-1">
         <input
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="用户名"
-          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="密码"
-          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
       </div>
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 rounded-xl bg-gene-purple text-white font-medium hover:bg-[#5B4BD4] transition-colors disabled:opacity-50"
+        className="w-full py-2.5 rounded-lg bg-gene-purple text-white text-sm font-medium hover:bg-[#5B4BD4] transition-colors disabled:opacity-50"
       >
-        {loading ? '正在唤醒数字灵魂...' : '唤醒'}
+        {loading ? '正在唤醒...' : '登录'}
       </button>
 
-      <p className="text-center text-sm text-gray-400">
+      <p className="text-center text-xs text-gray-500">
         尚无基因序列？{' '}
         <button type="button" onClick={onSwitch} className="text-life-cyan hover:underline">
           注册你的基因

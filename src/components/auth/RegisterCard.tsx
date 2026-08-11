@@ -44,14 +44,12 @@ export function RegisterCard({ onSwitch }: Props) {
       return;
     }
 
-    // Check if username already exists
     const existing = await userRepo.findByUsername(username.trim());
     if (existing) {
       setError('该用户名已被注册，请选择其他基因标识');
       return;
     }
 
-    // Step 1: Validate API Key first
     setStep('validating');
     setLoading(true);
     try {
@@ -69,7 +67,6 @@ export function RegisterCard({ onSwitch }: Props) {
       return;
     }
 
-    // Step 2: Create user with encrypted key
     setStep('creating');
     try {
       const { hash, salt } = await hashPassword(password);
@@ -88,8 +85,9 @@ export function RegisterCard({ onSwitch }: Props) {
 
       await userRepo.create(user);
       login(user.id, user.username, apiKey.trim());
+      ipc.window.setSize(1200, 800);
     } catch {
-      setError('播种基因序列失败，请重试');
+      setError('注册基因失败，请重试');
       setStep('form');
     } finally {
       setLoading(false);
@@ -97,27 +95,28 @@ export function RegisterCard({ onSwitch }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-8 w-full max-w-md space-y-4">
-      <div className="text-center">
-        <div className="text-4xl mb-2">🌱</div>
-        <h2 className="text-2xl font-bold text-white">注册你的基因</h2>
-        <p className="text-sm text-gray-400 mt-1">创建账号并绑定 DeepSeek API Key</p>
+    <form onSubmit={handleSubmit} className="w-full space-y-4">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <div className="text-3xl">🌱</div>
+        <h2 className="text-lg font-semibold text-white">注册你的基因</h2>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 text-sm text-red-400">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400">
           {error}
         </div>
       )}
 
-      <div className="space-y-3">
+      {/* Inputs — WeChat bottom-border style */}
+      <div className="space-y-1">
         <input
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="用户名"
           autoComplete="username"
-          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <input
           type="password"
@@ -125,7 +124,7 @@ export function RegisterCard({ onSwitch }: Props) {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="密码（至少 6 位）"
           autoComplete="new-password"
-          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <input
           type="password"
@@ -133,7 +132,7 @@ export function RegisterCard({ onSwitch }: Props) {
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="确认密码"
           autoComplete="new-password"
-          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <div className="relative">
           <input
@@ -142,12 +141,12 @@ export function RegisterCard({ onSwitch }: Props) {
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="DeepSeek API Key (sk-...)"
             autoComplete="off"
-            className="w-full px-4 py-3 pr-12 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-life-cyan transition-colors"
+            className="w-full px-1 py-3 pr-10 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-life-cyan transition-colors"
           />
           <button
             type="button"
             onClick={() => setShowKey(!showKey)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm"
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs"
           >
             {showKey ? '隐藏' : '显示'}
           </button>
@@ -157,14 +156,14 @@ export function RegisterCard({ onSwitch }: Props) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 rounded-xl bg-life-cyan text-[#0F0F1A] font-bold hover:bg-[#00B8B3] transition-colors disabled:opacity-50"
+        className="w-full py-2.5 rounded-lg bg-life-cyan text-[#0F0F1A] text-sm font-semibold hover:bg-[#00B8B3] transition-colors disabled:opacity-50"
       >
         {step === 'validating' && '正在验证基因序列...'}
-        {step === 'creating' && '正在播种基因序列...'}
-        {step === 'form' && '播种'}
+        {step === 'creating' && '正在注册基因...'}
+        {step === 'form' && '注册'}
       </button>
 
-      <p className="text-center text-sm text-gray-400">
+      <p className="text-center text-xs text-gray-500">
         已有基因序列？{' '}
         <button type="button" onClick={onSwitch} className="text-gene-purple hover:underline">
           唤醒数字灵魂

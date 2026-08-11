@@ -18,6 +18,7 @@ const noop = {
     minimize: () => {},
     maximize: () => {},
     close: () => {},
+    setSize: async () => false,
   },
 };
 

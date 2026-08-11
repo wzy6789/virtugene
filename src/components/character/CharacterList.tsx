@@ -1,28 +1,50 @@
-import { useAuthStore } from '../../store/auth-store';
+import { useEffect } from 'react';
+import { useChatStore } from '../../store/chat-store';
 
 interface Props {
   collapsed: boolean;
 }
 
 export function CharacterList({ collapsed }: Props) {
-  const logout = useAuthStore((s) => s.logout);
+  const characters = useChatStore((s) => s.characters);
+  const selectedId = useChatStore((s) => s.selectedCharacterId);
+  const loadCharacters = useChatStore((s) => s.loadCharacters);
+  const selectCharacter = useChatStore((s) => s.selectCharacter);
 
-  // Static preset list for Phase 2 — will be replaced with DB-backed list in Phase 3
-  const characters = [
-    { id: 'preset-linshuang', name: '林霜', avatar: '🧬', tags: ['理性', '毒舌', '极客'] },
-    { id: 'preset-aili', name: '艾莉', avatar: '🌌', tags: ['开朗', '好奇', '浪漫'] },
-    { id: 'preset-socrates', name: '苏格拉底', avatar: '🐱', tags: ['哲思', '慵懒', '幽默'] },
-  ];
+  useEffect(() => {
+    loadCharacters();
+  }, [loadCharacters]);
+
+  if (collapsed) {
+    return (
+      <div className="space-y-0.5 px-2">
+        {characters.map((char) => (
+          <button
+            key={char.id}
+            onClick={() => selectCharacter(char.id)}
+            className={`w-full flex items-center justify-center py-2.5 rounded-xl transition-colors ${
+              selectedId === char.id ? 'bg-gene-purple/20' : 'hover:bg-white/5'
+            }`}
+          >
+            <span className="text-xl">{char.avatar}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-1 px-2">
-      {characters.map((char) => (
-        <button
-          key={char.id}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-white/5 transition-colors group"
-        >
-          <span className="text-xl shrink-0">{char.avatar}</span>
-          {!collapsed && (
+    <div className="px-3 pb-2">
+      {characters.map((char, i) => (
+        <div key={char.id}>
+          {i > 0 && <div className="border-t border-white/[0.04] mx-1" />}
+          <button
+            onClick={() => selectCharacter(char.id)}
+            className={`w-full flex items-center gap-3 px-2 py-2.5 rounded-xl text-left transition-colors group ${
+              selectedId === char.id ? 'bg-gene-purple/20' : 'hover:bg-white/5'
+            }`}
+          >
+            <span className="text-xl shrink-0">{char.avatar}</span>
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate">{char.name}</p>
               <div className="flex gap-1 mt-0.5">
@@ -33,8 +55,8 @@ export function CharacterList({ collapsed }: Props) {
                 ))}
               </div>
             </div>
-          )}
-        </button>
+          </button>
+        </div>
       ))}
     </div>
   );
