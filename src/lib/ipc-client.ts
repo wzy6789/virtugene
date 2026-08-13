@@ -1,15 +1,24 @@
-/**
- * Renderer-side IPC wrapper.
- * Falls back gracefully when running in browser (dev without Electron).
- */
-
-const noop = {
+const noop: VirtuGeneAPI = {
   key: {
     validate: async () => ({ valid: false, error: '未在 Electron 环境中运行' }),
   },
   chat: {
-    stream: async () => {},
-    stop: () => {},
+    send: async () => ({ error: '未在 Electron 环境中运行' }),
+  },
+  character: {
+    generate: async () => ({ error: '未在 Electron 环境中运行' }),
+  },
+  file: {
+    parse: async () => ({ error: '未在 Electron 环境中运行' }),
+  },
+  proactive: {
+    generate: async () => ({ error: '未在 Electron 环境中运行' }),
+  },
+  memory: {
+    extract: async () => ({ error: '未在 Electron 环境中运行' }),
+  },
+  emotion: {
+    analyze: async () => ({ error: '未在 Electron 环境中运行' }),
   },
   shell: {
     open: async () => false,
@@ -22,4 +31,4 @@ const noop = {
   },
 };
 
-export const ipc = window.virtugene ?? noop;
+export const ipc: VirtuGeneAPI = window.virtugene ?? noop;

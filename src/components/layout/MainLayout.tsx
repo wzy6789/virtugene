@@ -7,7 +7,7 @@ interface Props {
 
 export function MainLayout({ children }: Props) {
   return (
-    <div className="h-full w-full flex flex-col bg-[#0F0F1A]">
+    <div className="h-full w-full flex flex-col bg-app">
       <TitleBar />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />

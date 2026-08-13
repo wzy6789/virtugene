@@ -99,7 +99,7 @@ export function RegisterCard({ onSwitch }: Props) {
       {/* Header */}
       <div className="text-center space-y-2">
         <div className="text-3xl">🌱</div>
-        <h2 className="text-lg font-semibold text-white">注册你的基因</h2>
+        <h2 className="text-lg font-semibold text-ink">注册你的基因</h2>
       </div>
 
       {error && (
@@ -116,7 +116,7 @@ export function RegisterCard({ onSwitch }: Props) {
           onChange={(e) => setUsername(e.target.value)}
           placeholder="用户名"
           autoComplete="username"
-          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-line-strong text-ink text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <input
           type="password"
@@ -124,7 +124,7 @@ export function RegisterCard({ onSwitch }: Props) {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="密码（至少 6 位）"
           autoComplete="new-password"
-          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-line-strong text-ink text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <input
           type="password"
@@ -132,7 +132,7 @@ export function RegisterCard({ onSwitch }: Props) {
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="确认密码"
           autoComplete="new-password"
-          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-line-strong text-ink text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <div className="relative">
           <input
@@ -141,12 +141,12 @@ export function RegisterCard({ onSwitch }: Props) {
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="DeepSeek API Key (sk-...)"
             autoComplete="off"
-            className="w-full px-1 py-3 pr-10 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-life-cyan transition-colors"
+            className="w-full px-1 py-3 pr-10 bg-transparent border-b border-line-strong text-ink text-sm placeholder-gray-500 focus:outline-none focus:border-life-cyan transition-colors"
           />
           <button
             type="button"
             onClick={() => setShowKey(!showKey)}
-            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs"
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-sub text-xs"
           >
             {showKey ? '隐藏' : '显示'}
           </button>

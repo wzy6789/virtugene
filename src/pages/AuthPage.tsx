@@ -7,7 +7,7 @@ export function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#0F0F1A]">
+    <div className="h-full w-full flex flex-col bg-app">
       {/* Mini titlebar — drag region + close */}
       <header className="drag-region h-8 flex items-center justify-end shrink-0">
         <button
@@ -35,7 +35,7 @@ export function AuthPage() {
           )}
 
           {/* Dev reset */}
-          <div className="mt-6 pt-4 border-t border-white/[0.06] text-center">
+          <div className="mt-6 pt-4 border-t border-line text-center">
             <button
               onClick={async () => {
                 localStorage.clear();

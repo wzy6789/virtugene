@@ -10,11 +10,11 @@ export function TitleBar() {
   };
 
   return (
-    <header className="drag-region h-9 flex items-center justify-between bg-[#0F0F1A] border-b border-white/5 select-none shrink-0">
+    <header className="drag-region h-9 flex items-center justify-between bg-app border-b border-line select-none shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-2 pl-4">
         <span className="text-xl">🧬</span>
-        <span className="text-sm font-semibold tracking-wide text-white">
+        <span className="text-sm font-semibold tracking-wide text-ink">
           Virtu<span className="text-gene-purple">Gene</span>
         </span>
       </div>
@@ -23,13 +23,13 @@ export function TitleBar() {
       <div className="flex h-full no-drag">
         <button
           onClick={() => ipc.window.minimize()}
-          className="w-11 h-full flex items-center justify-center text-gray-400 hover:bg-white/10 transition-colors"
+          className="w-11 h-full flex items-center justify-center text-gray-400 hover:bg-surface-strong transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12"><rect y="5" width="12" height="1.5" fill="currentColor" /></svg>
         </button>
         <button
           onClick={handleMaximize}
-          className="w-11 h-full flex items-center justify-center text-gray-400 hover:bg-white/10 transition-colors"
+          className="w-11 h-full flex items-center justify-center text-gray-400 hover:bg-surface-strong transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
         </button>

@@ -1,6 +1,6 @@
 appId: com.virtugene.app
 productName: VirtuGene
-copyright: Copyright © 2025 VirtuGene
+copyright: Copyright © 2026 VirtuGene
 
 directories:
   output: release
@@ -11,6 +11,7 @@ files:
   - dist/renderer/**/*
 
 win:
+  icon: resources/icon.png
   target:
     - target: nsis
       arch: [x64]
@@ -23,6 +24,7 @@ nsis:
   deleteAppDataOnUninstall: true
 
 mac:
+  icon: resources/icon.png
   target:
     - target: dmg
       arch: [x64, arm64]

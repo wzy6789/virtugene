@@ -6,7 +6,8 @@ export const characterRepo = {
   },
 
   async getPresets(): Promise<Character[]> {
-    return db.characters.where('isPreset').equals(true).toArray();
+    const all = await db.characters.toArray();
+    return all.filter((c) => c.isPreset === true);
   },
 
   async getById(id: string): Promise<Character | undefined> {
@@ -23,6 +24,15 @@ export const characterRepo = {
 
   async deleteById(id: string): Promise<void> {
     await db.characters.delete(id);
+  },
+
+  async getPublished(): Promise<Character[]> {
+    const all = await db.characters.toArray();
+    return all.filter((c) => c.published === true);
+  },
+
+  async getByCreator(userId: string): Promise<Character[]> {
+    return db.characters.where('createdBy').equals(userId).toArray();
   },
 
   async count(): Promise<number> {

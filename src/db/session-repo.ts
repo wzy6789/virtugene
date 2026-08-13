@@ -29,4 +29,23 @@ export const sessionRepo = {
     await db.sessions.delete(id);
     await db.messages.where('sessionId').equals(id).delete();
   },
+
+  async incrementUnread(id: string): Promise<void> {
+    const s = await db.sessions.get(id);
+    if (s) await db.sessions.update(id, { unreadCount: (s.unreadCount ?? 0) + 1 });
+  },
+
+  async clearUnread(id: string): Promise<void> {
+    await db.sessions.update(id, { unreadCount: 0 });
+  },
+
+  async getTotalUnread(): Promise<number> {
+    const all = await db.sessions.toArray();
+    return all.reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);
+  },
+
+  async getUnreadByCharacter(characterId: string): Promise<number> {
+    const sessions = await db.sessions.where('characterId').equals(characterId).toArray();
+    return sessions.reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);
+  },
 };

@@ -17,6 +17,11 @@ export default function App() {
     initSeedCharacters().then(() => setReady(true));
   }, []);
 
+  // Apply theme class at the root so both auth and chat screens are themed
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+
   useEffect(() => {
     if (isLoggedIn && !didResize.current) {
       ipc.window.setSize(1200, 800);
@@ -30,23 +35,21 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-[#0F0F1A]">
+      <div className="h-full w-full flex items-center justify-center bg-app">
         <div className="text-4xl animate-pulse">🧬</div>
       </div>
     );
   }
 
   return (
-    <div className={`${theme} h-full w-full`}>
-      <div className="h-full w-full bg-[#0F0F1A] text-white dark:bg-[#0F0F1A]">
-        {isLoggedIn ? (
-          <MainLayout>
-            <ChatPage />
-          </MainLayout>
-        ) : (
-          <AuthPage />
-        )}
-      </div>
+    <div className="h-full w-full bg-app text-ink">
+      {isLoggedIn ? (
+        <MainLayout>
+          <ChatPage />
+        </MainLayout>
+      ) : (
+        <AuthPage />
+      )}
     </div>
   );
 }

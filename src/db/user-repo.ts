@@ -9,6 +9,10 @@ export const userRepo = {
     return db.users.add(user);
   },
 
+  async update(id: string, updates: Partial<User>): Promise<number> {
+    return db.users.update(id, updates);
+  },
+
   async deleteById(id: string): Promise<void> {
     await db.users.delete(id);
   },

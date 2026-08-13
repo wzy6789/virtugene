@@ -30,6 +30,16 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'virtugene-auth',
+      partialize: (state) => ({
+        userId: state.userId,
+        username: state.username,
+      }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<AuthState>),
+        isLoggedIn: false,
+        apiKey: null,
+      }),
     }
   )
 );

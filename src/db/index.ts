@@ -18,7 +18,18 @@ export interface Character {
   tags: string[];
   isPreset: boolean;
   isCustom: boolean;
+  published: boolean;
+  createdBy: string;
   createdAt: number;
+  /** 主动倾向 0-1，决定该角色是否会主动发消息及频率 */
+  proactivity: number;
+}
+
+export interface CharacterState {
+  characterId: string;
+  affinity: number;
+  mood: number;
+  updatedAt: number;
 }
 
 export interface Session {
@@ -27,6 +38,7 @@ export interface Session {
   title: string;
   createdAt: number;
   updatedAt: number;
+  unreadCount: number;
 }
 
 export interface Message {
@@ -35,6 +47,35 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: number;
+  isProactive: boolean;
+}
+
+export interface MemoryItem {
+  id: string;
+  characterId: string;
+  content: string;
+  type: 'auto' | 'summary';
+  createdAt: number;
+}
+
+export interface EmotionDimensions {
+  valence: number;
+  arousal: number;
+  intimacy: number;
+  engagement: number;
+  expressiveness: number;
+  stability: number;
+}
+
+export interface EmotionSnapshot {
+  id: string;
+  characterId: string;
+  sessionId: string;
+  dimensions: EmotionDimensions;
+  dominantEmotion: string;
+  summary: string;
+  messageCount: number;
+  createdAt: number;
 }
 
 export class VirtuGeneDB extends Dexie {
@@ -42,6 +83,9 @@ export class VirtuGeneDB extends Dexie {
   characters!: Table<Character, string>;
   sessions!: Table<Session, string>;
   messages!: Table<Message, string>;
+  memories!: Table<MemoryItem, string>;
+  emotionSnapshots!: Table<EmotionSnapshot, string>;
+  characterStates!: Table<CharacterState, string>;
 
   constructor() {
     super('virtugene');
@@ -54,6 +98,58 @@ export class VirtuGeneDB extends Dexie {
       characters: 'id,isPreset',
       sessions: 'id,characterId,updatedAt',
       messages: 'id,sessionId,createdAt',
+    });
+    this.version(3).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+    }).upgrade(async (tx) => {
+      await tx.table('characters').toCollection().modify((char) => {
+        char.published = char.published ?? false;
+        char.createdBy = char.createdBy ?? '';
+      });
+    });
+    this.version(4).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+    }).upgrade(async (tx) => {
+      await tx.table('sessions').toCollection().modify((s) => {
+        s.unreadCount = s.unreadCount ?? 0;
+      });
+      await tx.table('messages').toCollection().modify((m) => {
+        m.isProactive = m.isProactive ?? false;
+      });
+    });
+    this.version(5).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+      memories: 'id,characterId,createdAt',
+    });
+    this.version(6).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+      memories: 'id,characterId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+    });
+    this.version(7).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+      memories: 'id,characterId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+      characterStates: 'characterId',
+    }).upgrade(async (tx) => {
+      await tx.table('characters').toCollection().modify((char) => {
+        char.proactivity = char.proactivity ?? 0.5;
+      });
     });
   }
 }

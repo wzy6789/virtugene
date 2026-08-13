@@ -5,6 +5,33 @@
 :root {
   --color-gene-purple: #6C5CE7;
   --color-life-cyan: #00CEC9;
+
+  /* Light theme */
+  --bg: #FFFFFF;
+  --bg-panel: #F8F7FF;
+  --bg-surface: rgba(0, 0, 0, 0.04);
+  --bg-surface-strong: rgba(0, 0, 0, 0.07);
+  --bg-glass: rgba(255, 255, 255, 0.6);
+  --text: #1A1A2E;
+  --text-secondary: #6B7280;
+  --border: #E5E7EB;
+  --border-strong: #D1D5DB;
+  --msg-ai: #F3F4F6;
+  --msg-ai-text: #1A1A2E;
+}
+
+.dark {
+  --bg: #0F0F1A;
+  --bg-panel: #1A1A2E;
+  --bg-surface: rgba(255, 255, 255, 0.05);
+  --bg-surface-strong: rgba(255, 255, 255, 0.10);
+  --bg-glass: rgba(15, 15, 26, 0.7);
+  --text: #F0EDFF;
+  --text-secondary: #9CA3AF;
+  --border: #2A2A4A;
+  --border-strong: #3A3A5C;
+  --msg-ai: #1E1E36;
+  --msg-ai-text: #E5E7EB;
 }
 
 html, body, #root {
@@ -16,14 +43,9 @@ html, body, #root {
 
 /* Glass card base */
 .glass-card {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-glass);
   backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.dark .glass-card {
-  background: rgba(15, 15, 26, 0.7);
-  border-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
 }
 
 /* DNA helix background pattern */
@@ -58,4 +80,26 @@ html, body, #root {
 
 .no-drag {
   -webkit-app-region: no-drag;
+}
+
+/* Modal fade-in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Emotion chart polygon appear */
+@keyframes chartAppear {
+  from { opacity: 0; transform-origin: center; transform: scale(0.5); }
+  to { opacity: 1; transform-origin: center; transform: scale(1); }
+}
+
+/* Emotion chart tooltip fade-in */
+@keyframes tooltipIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

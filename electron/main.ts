@@ -2,6 +2,12 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { registerKeyIPC } from './ipc/key';
 import { registerShellIPC } from './ipc/shell';
+import { registerChatIPC } from './ipc/chat';
+import { registerGenerateIPC } from './ipc/generate';
+import { registerFileIPC } from './ipc/file';
+import { registerProactiveIPC } from './ipc/proactive';
+import { registerMemoryIPC } from './ipc/memory';
+import { registerEmotionIPC } from './ipc/emotion';
 
 const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged;
 
@@ -49,6 +55,12 @@ function loadDevServer(win: BrowserWindow, url: string, retries = 10) {
 app.whenReady().then(() => {
   registerKeyIPC();
   registerShellIPC();
+  registerChatIPC();
+  registerGenerateIPC();
+  registerFileIPC();
+  registerProactiveIPC();
+  registerMemoryIPC();
+  registerEmotionIPC();
 
   const win = createWindow();
 

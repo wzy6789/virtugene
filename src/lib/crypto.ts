@@ -3,18 +3,22 @@
  * All keys stay local — never transmitted.
  */
 
-function bufferToBase64(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+function bufferToBase64(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  return btoa(String.fromCharCode(...bytes));
 }
 
-function base64ToBuffer(b64: string): Uint8Array {
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+function base64ToBuffer(b64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 /** PBKDF2 one-way hash for login passwords. */
 export async function hashPassword(
   password: string,
-  salt?: Uint8Array
+  salt?: Uint8Array<ArrayBuffer>
 ): Promise<{ hash: string; salt: string }> {
   const s = salt ?? crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey(
@@ -46,7 +50,7 @@ export async function verifyPassword(
 }
 
 /** Derive an AES-GCM encryption key from the user's login password. */
-async function deriveEncryptionKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveEncryptionKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -67,7 +71,7 @@ async function deriveEncryptionKey(password: string, salt: Uint8Array): Promise<
 export async function encryptApiKey(
   apiKey: string,
   password: string,
-  salt: Uint8Array
+  salt: Uint8Array<ArrayBuffer>
 ): Promise<{ iv: string; ciphertext: string }> {
   const encKey = await deriveEncryptionKey(password, salt);
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -88,7 +92,7 @@ export async function decryptApiKey(
   iv: string,
   ciphertext: string,
   password: string,
-  salt: Uint8Array
+  salt: Uint8Array<ArrayBuffer>
 ): Promise<string> {
   const encKey = await deriveEncryptionKey(password, salt);
   const decrypted = await crypto.subtle.decrypt(

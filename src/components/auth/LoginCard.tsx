@@ -60,7 +60,7 @@ export function LoginCard({ onSwitch }: Props) {
       {/* Header */}
       <div className="text-center space-y-2">
         <div className="text-3xl">🧬</div>
-        <h2 className="text-lg font-semibold text-white">唤醒数字灵魂</h2>
+        <h2 className="text-lg font-semibold text-ink">唤醒数字灵魂</h2>
       </div>
 
       {error && (
@@ -76,14 +76,14 @@ export function LoginCard({ onSwitch }: Props) {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="用户名"
-          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-line-strong text-ink text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="密码"
-          className="w-full px-1 py-3 bg-transparent border-b border-white/15 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
+          className="w-full px-1 py-3 bg-transparent border-b border-line-strong text-ink text-sm placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors"
         />
       </div>
 
