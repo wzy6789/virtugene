@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { stateRepo } from '../db/state-repo';
+import { useAuthStore } from './auth-store';
 
 interface CharacterStateState {
   characterId: string | null;
@@ -17,12 +18,14 @@ export const useCharacterStateStore = create<CharacterStateState>((set, get) => 
   mood: 70,
 
   load: async (characterId) => {
-    const state = await stateRepo.getOrCreate(characterId);
+    const userId = useAuthStore.getState().userId ?? '';
+    const state = await stateRepo.getOrCreate(characterId, userId);
     set({ characterId, affinity: state.affinity, mood: state.mood });
   },
 
   bump: async (characterId, dAffinity, dMood) => {
-    const state = await stateRepo.adjust(characterId, dAffinity, dMood);
+    const userId = useAuthStore.getState().userId ?? '';
+    const state = await stateRepo.adjust(characterId, userId, dAffinity, dMood);
     if (get().characterId === characterId) {
       set({ affinity: state.affinity, mood: state.mood });
     }

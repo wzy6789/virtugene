@@ -29,6 +29,12 @@ const noop: VirtuGeneAPI = {
     close: () => {},
     setSize: async () => false,
   },
+  update: {
+    check: async () => ({ error: '未在 Electron 环境中运行' }),
+    download: async () => ({ error: '未在 Electron 环境中运行' }),
+    install: async () => ({ error: '未在 Electron 环境中运行' }),
+    onStatus: () => () => {},
+  },
 };
 
 export const ipc: VirtuGeneAPI = window.virtugene ?? noop;

@@ -27,6 +27,7 @@ export interface Character {
 
 export interface CharacterState {
   characterId: string;
+  userId: string;
   affinity: number;
   mood: number;
   updatedAt: number;
@@ -35,6 +36,7 @@ export interface CharacterState {
 export interface Session {
   id: string;
   characterId: string;
+  userId: string;
   title: string;
   createdAt: number;
   updatedAt: number;
@@ -53,6 +55,7 @@ export interface Message {
 export interface MemoryItem {
   id: string;
   characterId: string;
+  userId: string;
   content: string;
   type: 'auto' | 'summary';
   createdAt: number;
@@ -85,7 +88,7 @@ export class VirtuGeneDB extends Dexie {
   messages!: Table<Message, string>;
   memories!: Table<MemoryItem, string>;
   emotionSnapshots!: Table<EmotionSnapshot, string>;
-  characterStates!: Table<CharacterState, string>;
+  characterStates!: Table<CharacterState, [string, string]>;
 
   constructor() {
     super('virtugene');
@@ -150,6 +153,32 @@ export class VirtuGeneDB extends Dexie {
       await tx.table('characters').toCollection().modify((char) => {
         char.proactivity = char.proactivity ?? 0.5;
       });
+    });
+    this.version(8).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,userId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+      memories: 'id,characterId,userId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+      characterStates: 'characterId',
+    }).upgrade(async (tx) => {
+      // Pre-multi-user data has no userId and cannot be attributed to any account.
+      // Clear conversation-scoped data once; users and characters are preserved.
+      await tx.table('sessions').clear();
+      await tx.table('messages').clear();
+      await tx.table('memories').clear();
+      await tx.table('emotionSnapshots').clear();
+      await tx.table('characterStates').clear();
+    });
+    this.version(9).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,userId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+      memories: 'id,characterId,userId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+      characterStates: '[characterId+userId]',
     });
   }
 }

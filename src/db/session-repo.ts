@@ -1,12 +1,11 @@
 import { db, type Session } from './index';
 
 export const sessionRepo = {
-  async getByCharacter(characterId: string): Promise<Session[]> {
-    return db.sessions
-      .where('characterId')
-      .equals(characterId)
-      .reverse()
-      .sortBy('updatedAt');
+  async getByCharacter(characterId: string, userId: string): Promise<Session[]> {
+    const sessions = await db.sessions.where('characterId').equals(characterId).toArray();
+    return sessions
+      .filter((s) => s.userId === userId)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
   },
 
   async getById(id: string): Promise<Session | undefined> {
@@ -39,13 +38,15 @@ export const sessionRepo = {
     await db.sessions.update(id, { unreadCount: 0 });
   },
 
-  async getTotalUnread(): Promise<number> {
-    const all = await db.sessions.toArray();
+  async getTotalUnread(userId: string): Promise<number> {
+    const all = await db.sessions.where('userId').equals(userId).toArray();
     return all.reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);
   },
 
-  async getUnreadByCharacter(characterId: string): Promise<number> {
+  async getUnreadByCharacter(characterId: string, userId: string): Promise<number> {
     const sessions = await db.sessions.where('characterId').equals(characterId).toArray();
-    return sessions.reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);
+    return sessions
+      .filter((s) => s.userId === userId)
+      .reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);
   },
 };

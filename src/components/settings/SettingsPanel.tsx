@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { useAuthStore } from '../../store/auth-store';
 import { useChatStore } from '../../store/chat-store';
+import { useCharacterStateStore } from '../../store/character-state-store';
+import { useEmotionStore } from '../../store/emotion-store';
+import { useUpdateStore } from '../../store/update-store';
 import { userRepo } from '../../db/user-repo';
 import { encryptApiKey, verifyPassword } from '../../lib/crypto';
 import { ipc } from '../../lib/ipc-client';
@@ -19,6 +22,11 @@ function maskKey(apiKey: string): string {
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { userId, username, apiKey, setApiKey, logout } = useAuthStore();
   const clearAllData = useChatStore((s) => s.clearAllData);
+  const updateStatus = useUpdateStore((s) => s.status);
+  const updateChecking = useUpdateStore((s) => s.checking);
+  const checkUpdate = useUpdateStore((s) => s.check);
+  const downloadUpdate = useUpdateStore((s) => s.download);
+  const installUpdate = useUpdateStore((s) => s.install);
 
   // Key replacement state
   const [isReplacing, setIsReplacing] = useState(false);
@@ -103,6 +111,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     await clearAllData();
+    useCharacterStateStore.getState().clear();
+    useEmotionStore.getState().clearCurrent();
     localStorage.clear();
     logout();
     setIsDeleting(false);
@@ -189,6 +199,51 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* App update */}
+          <div>
+            <h3 className="text-sm font-medium text-ink mb-3">基因序列更新</h3>
+            <div className="p-4 rounded-xl bg-surface border border-line space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">当前版本</span>
+                <span className="text-sm text-ink font-mono">v1.0.1</span>
+              </div>
+
+              {updateStatus?.state === 'available' && (
+                <button
+                  onClick={downloadUpdate}
+                  className="w-full px-4 py-2 rounded-lg text-sm bg-gene-purple text-white hover:bg-[#5B4BD4] transition-colors"
+                >
+                  下载新版本 v{updateStatus.version}
+                </button>
+              )}
+              {updateStatus?.state === 'downloaded' && (
+                <button
+                  onClick={installUpdate}
+                  className="w-full px-4 py-2 rounded-lg text-sm bg-gene-purple text-white hover:bg-[#5B4BD4] transition-colors"
+                >
+                  重启安装 v{updateStatus.version}
+                </button>
+              )}
+              {updateStatus?.state === 'downloading' && (
+                <p className="text-xs text-life-cyan">正在下载更新... {updateStatus.percent}%</p>
+              )}
+              {updateStatus?.state === 'not-available' && (
+                <p className="text-xs text-sub">已是最新版本</p>
+              )}
+              {updateStatus?.state === 'error' && (
+                <p className="text-xs text-red-400">{updateStatus.message}</p>
+              )}
+
+              <button
+                onClick={checkUpdate}
+                disabled={updateChecking}
+                className="w-full px-4 py-2 rounded-lg text-sm text-ink bg-surface border border-line-strong hover:border-gene-purple/50 disabled:opacity-50 transition-colors"
+              >
+                {updateChecking ? '检查中...' : '检查更新'}
+              </button>
             </div>
           </div>
 

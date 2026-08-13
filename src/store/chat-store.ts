@@ -36,16 +36,18 @@ interface ChatState {
   deleteCharacter: (id: string) => Promise<void>;
   clearAllData: () => Promise<void>;
   triggerProactive: () => Promise<void>;
+  reset: () => void;
 }
 
-async function getOrCreateSession(characterId: string): Promise<Session> {
-  const sessions = await sessionRepo.getByCharacter(characterId);
+async function getOrCreateSession(characterId: string, userId: string): Promise<Session> {
+  const sessions = await sessionRepo.getByCharacter(characterId, userId);
   if (sessions.length > 0) return sessions[0];
 
   const now = Date.now();
   const session: Session = {
     id: crypto.randomUUID(),
     characterId,
+    userId,
     title: '新对话',
     createdAt: now,
     updatedAt: now,
@@ -55,8 +57,8 @@ async function getOrCreateSession(characterId: string): Promise<Session> {
   return session;
 }
 
-async function getLastMessage(characterId: string): Promise<CharPreview | null> {
-  const sessions = await sessionRepo.getByCharacter(characterId);
+async function getLastMessage(characterId: string, userId: string): Promise<CharPreview | null> {
+  const sessions = await sessionRepo.getByCharacter(characterId, userId);
   if (sessions.length === 0) return null;
   const msgs = await messageRepo.getBySession(sessions[0].id);
   if (msgs.length === 0) return null;
@@ -101,8 +103,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const previews: Record<string, CharPreview | null> = {};
     const unreadCounts: Record<string, number> = {};
     for (const c of visible) {
-      previews[c.id] = await getLastMessage(c.id);
-      unreadCounts[c.id] = await sessionRepo.getUnreadByCharacter(c.id);
+      previews[c.id] = await getLastMessage(c.id, userId);
+      unreadCounts[c.id] = await sessionRepo.getUnreadByCharacter(c.id, userId);
     }
     set({ characters: visible, charPreviews: previews, unreadByCharacter: unreadCounts });
     if (visible.length > 0 && !get().selectedCharacterId) {
@@ -111,10 +113,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   selectCharacter: async (id) => {
-    const session = await getOrCreateSession(id);
+    const userId = useAuthStore.getState().userId ?? '';
+    const session = await getOrCreateSession(id, userId);
     const msgs = await messageRepo.getBySession(session.id);
-    // Clear unread for this character
-    const sessions = await db.sessions.where('characterId').equals(id).toArray();
+    // Clear unread for this character (user's own sessions only)
+    const sessions = await sessionRepo.getByCharacter(id, userId);
     for (const s of sessions) {
       await sessionRepo.clearUnread(s.id);
     }
@@ -141,7 +144,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   addProactiveMessage: async (characterId, content) => {
-    const session = await getOrCreateSession(characterId);
+    const userId = useAuthStore.getState().userId ?? '';
+    const session = await getOrCreateSession(characterId, userId);
     const msg: Message = {
       id: crypto.randomUUID(),
       sessionId: session.id,
@@ -179,9 +183,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   fetchUnreadCounts: async () => {
     const { characters } = get();
+    const userId = useAuthStore.getState().userId ?? '';
     const counts: Record<string, number> = {};
     for (const c of characters) {
-      counts[c.id] = await sessionRepo.getUnreadByCharacter(c.id);
+      counts[c.id] = await sessionRepo.getUnreadByCharacter(c.id, userId);
     }
     set({ unreadByCharacter: counts });
   },
@@ -189,6 +194,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   triggerProactive: async () => {
     const { characters } = get();
     const apiKey = useAuthStore.getState().apiKey;
+    const userId = useAuthStore.getState().userId ?? '';
     if (!apiKey || characters.length === 0) return;
 
     // 只有主动倾向足够强的角色才会主动发消息（冰冷角色不会）
@@ -206,7 +212,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       // Get recent messages for context
-      const session = await getOrCreateSession(targetChar.id);
+      const session = await getOrCreateSession(targetChar.id, userId);
       const msgs = await messageRepo.getBySession(session.id);
 
       // 上一条主动消息未被回应 → 好感度/心情下滑
@@ -216,7 +222,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       // 读取最新关系状态，注入主动消息语气
-      const state = await stateRepo.getOrCreate(targetChar.id);
+      const state = await stateRepo.getOrCreate(targetChar.id, userId);
 
       const lastMessages = msgs.slice(-10).map((m) => ({
         role: m.role,
@@ -245,9 +251,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   refreshPreviews: async () => {
     const { characters } = get();
+    const userId = useAuthStore.getState().userId ?? '';
     const previews: Record<string, CharPreview | null> = {};
     for (const c of characters) {
-      previews[c.id] = await getLastMessage(c.id);
+      previews[c.id] = await getLastMessage(c.id, userId);
     }
     set({ charPreviews: previews });
   },
@@ -292,24 +299,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   deleteCharacterWithSessions: async (id) => {
-    const sessions = await sessionRepo.getByCharacter(id);
+    const userId = useAuthStore.getState().userId ?? '';
+    const sessions = await sessionRepo.getByCharacter(id, userId);
     for (const s of sessions) {
       await sessionRepo.deleteById(s.id);
     }
     await characterRepo.deleteById(id);
-    await memoryRepo.clearForCharacter(id);
+    await memoryRepo.clearForCharacter(id, userId);
     await emotionRepo.deleteByCharacter(id);
-    await stateRepo.deleteByCharacter(id);
+    await stateRepo.deleteByCharacter(id, userId);
 
     const { selectedCharacterId } = get();
-    const userId = useAuthStore.getState().userId ?? '';
     const all = await characterRepo.getAll();
     const visible = all.filter(
       (c) => c.isPreset || c.published || c.createdBy === userId,
     );
     const previews: Record<string, CharPreview | null> = {};
     for (const c of visible) {
-      previews[c.id] = await getLastMessage(c.id);
+      previews[c.id] = await getLastMessage(c.id, userId);
     }
     set({ characters: visible, charPreviews: previews });
 
@@ -327,6 +334,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await db.characters.clear();
     await db.sessions.clear();
     await db.messages.clear();
+    await db.memories.clear();
+    await db.emotionSnapshots.clear();
     await db.characterStates.clear();
     set({
       selectedCharacterId: null,
@@ -334,6 +343,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       characters: [],
       messages: [],
       charPreviews: {},
+      unreadByCharacter: {},
+    });
+  },
+
+  reset: () => {
+    set({
+      selectedCharacterId: null,
+      currentSessionId: null,
+      characters: [],
+      messages: [],
+      charPreviews: {},
+      unreadByCharacter: {},
     });
   },
 }));

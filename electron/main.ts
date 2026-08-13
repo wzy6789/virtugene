@@ -8,8 +8,9 @@ import { registerFileIPC } from './ipc/file';
 import { registerProactiveIPC } from './ipc/proactive';
 import { registerMemoryIPC } from './ipc/memory';
 import { registerEmotionIPC } from './ipc/emotion';
+import { registerUpdater } from './updater';
 
-const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged;
+const isDev = !app.isPackaged;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -63,6 +64,10 @@ app.whenReady().then(() => {
   registerEmotionIPC();
 
   const win = createWindow();
+
+  if (app.isPackaged) {
+    registerUpdater();
+  }
 
   // Resize window — expand after login, shrink after logout
   ipcMain.handle('window:setSize', (_event, { width, height }: { width: number; height: number }) => {

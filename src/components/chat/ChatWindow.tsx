@@ -43,6 +43,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
   const characters = useChatStore((s) => s.characters);
   const addMessage = useChatStore((s) => s.addMessage);
   const apiKey = useAuthStore((s) => s.apiKey);
+  const userId = useAuthStore((s) => s.userId) ?? '';
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<ChatInputHandle>(null);
 
@@ -82,13 +83,13 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
     }));
 
     // Inject character memories into system prompt
-    const memories = await memoryRepo.getByCharacter(character.id);
+    const memories = await memoryRepo.getByCharacter(character.id, userId);
     const memoryContext = memories.length > 0
       ? '\n\n[关于用户的长期记忆]\n' + memories.map((m) => `- ${m.content}`).join('\n')
       : '';
 
     // Inject relationship state (affinity/mood) so it shapes the reply tone
-    const state = await stateRepo.getOrCreate(character.id);
+    const state = await stateRepo.getOrCreate(character.id, userId);
     const relationshipContext =
       `\n\n[当前关系状态]\n用户与你的好感度：${Math.round(state.affinity)}/100，你此刻的心情：${Math.round(state.mood)}/100。` +
       '让这两个数值自然影响你的语气：好感度越高越亲近温和，越低越疏离防备；心情越高越轻快，越低越低落或易烦。不要直接说出这些数字。';
@@ -155,6 +156,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
         const items: MemoryItem[] = result.memories.map((content: string) => ({
           id: crypto.randomUUID(),
           characterId,
+          userId,
           content,
           type: 'auto' as const,
           createdAt: now,

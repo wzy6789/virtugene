@@ -1,5 +1,13 @@
 /// <reference types="vite/client" />
 
+type UpdateStatus =
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'not-available'; version?: string }
+  | { state: 'downloading'; percent: number }
+  | { state: 'downloaded'; version: string }
+  | { state: 'error'; message: string };
+
 interface VirtuGeneAPI {
   key: {
     validate: (apiKey: string) => Promise<{ valid: boolean; error?: string }>;
@@ -63,6 +71,12 @@ interface VirtuGeneAPI {
     maximize: () => void;
     close: () => void;
     setSize: (width: number, height: number) => Promise<boolean>;
+  };
+  update: {
+    check: () => Promise<{ version?: string | null; error?: string }>;
+    download: () => Promise<{ ok?: boolean; error?: string }>;
+    install: () => Promise<{ ok?: boolean; error?: string }>;
+    onStatus: (callback: (status: UpdateStatus) => void) => () => void;
   };
 }
 

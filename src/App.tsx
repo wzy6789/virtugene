@@ -14,7 +14,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    initSeedCharacters().then(() => setReady(true));
+    initSeedCharacters().finally(() => setReady(true));
   }, []);
 
   // Apply theme class at the root so both auth and chat screens are themed

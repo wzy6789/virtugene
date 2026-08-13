@@ -55,6 +55,16 @@ contextBridge.exposeInMainWorld('virtugene', {
       characterName: string;
     }) => ipcRenderer.invoke('emotion:analyze', params),
   },
+  update: {
+    check: () => ipcRenderer.invoke('update:check'),
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onStatus: (callback: (status: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) => callback(status);
+      ipcRenderer.on('update:status', handler);
+      return () => ipcRenderer.removeListener('update:status', handler);
+    },
+  },
   shell: {
     open: (url: string) => ipcRenderer.invoke('shell:open', { url }),
   },

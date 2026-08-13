@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useThemeStore } from '../../store/theme-store';
 import { useAuthStore } from '../../store/auth-store';
+import { useChatStore } from '../../store/chat-store';
+import { useCharacterStateStore } from '../../store/character-state-store';
+import { useEmotionStore } from '../../store/emotion-store';
 import { ipc } from '../../lib/ipc-client';
 import { CharacterList } from '../character/CharacterList';
 import { CharacterAddModal } from '../character/CharacterAddModal';
@@ -82,6 +85,9 @@ export function Sidebar() {
             onClick={() => {
               ipc.window.setSize(320, 466);
               localStorage.removeItem('virtugene-auth');
+              useChatStore.getState().reset();
+              useCharacterStateStore.getState().clear();
+              useEmotionStore.getState().clearCurrent();
               logout();
             }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
