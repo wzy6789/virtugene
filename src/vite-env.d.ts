@@ -37,6 +37,8 @@ interface VirtuGeneAPI {
   };
   file: {
     parse: (file: File) => Promise<{ text?: string; error?: string }>;
+    parserReady: () => Promise<{ ready: boolean }>;
+    downloadParser: () => Promise<{ ok?: boolean; error?: string }>;
   };
   proactive: {
     generate: (params: {

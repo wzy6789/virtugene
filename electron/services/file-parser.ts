@@ -1,36 +1,42 @@
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
+import { app } from 'electron';
+
+const PARSER_FILENAME = 'parser.cjs';
+
+export function parserPath(): string {
+  return path.join(app.getPath('userData'), 'parser', PARSER_FILENAME);
+}
+
+export function isParserReady(): boolean {
+  return fs.existsSync(parserPath());
+}
+
+async function loadParser(): Promise<(filePath: string) => Promise<string>> {
+  const mod: any = await import(pathToFileURL(parserPath()).href);
+  const parse = mod.parseFile ?? mod.default?.parseFile;
+  if (typeof parse !== 'function') {
+    throw new Error('parser:invalid');
+  }
+  return parse as (filePath: string) => Promise<string>;
+}
 
 export async function parseFile(filePath: string): Promise<string> {
   const ext = path.extname(filePath).toLowerCase();
 
   switch (ext) {
     case '.txt':
-      return parseTxt(filePath);
+      return fs.readFileSync(filePath, 'utf-8').slice(0, 10000);
     case '.pdf':
-      return parsePdf(filePath);
-    case '.docx':
-      return parseDocx(filePath);
+    case '.docx': {
+      if (!isParserReady()) {
+        throw new Error('parser:missing');
+      }
+      const parse = await loadParser();
+      return parse(filePath);
+    }
     default:
       throw new Error(`不支持的文件格式: ${ext}`);
   }
-}
-
-async function parseTxt(filePath: string): Promise<string> {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  return content.slice(0, 10000);
-}
-
-async function parsePdf(filePath: string): Promise<string> {
-  const pdfParse = (await import('pdf-parse')).default;
-  const buffer = fs.readFileSync(filePath);
-  const data = await pdfParse(buffer);
-  return data.text.slice(0, 10000);
-}
-
-async function parseDocx(filePath: string): Promise<string> {
-  const mod = await import('mammoth');
-  const mammoth = mod.default ?? mod;
-  const result = await mammoth.extractRawText({ path: filePath });
-  return result.value.slice(0, 10000);
 }

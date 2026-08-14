@@ -6,6 +6,10 @@ directories:
   output: release
   buildResources: resources
 
+electronLanguages:
+  - zh-CN
+  - en-US
+
 files:
   - dist-electron/**/*
   - dist/renderer/**/*

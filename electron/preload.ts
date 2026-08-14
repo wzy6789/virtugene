@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('virtugene', {
       const filePath = webUtils.getPathForFile(file);
       return ipcRenderer.invoke('file:parse', { filePath });
     },
+    parserReady: () => ipcRenderer.invoke('file:parserReady'),
+    downloadParser: () => ipcRenderer.invoke('file:downloadParser'),
   },
   proactive: {
     generate: (params: {

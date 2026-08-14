@@ -1,9 +1,7 @@
 import { useState, useRef } from 'react';
-import Picker from '@emoji-mart/react';
-import data from '@emoji-mart/data';
 import { useAuthStore } from '../../store/auth-store';
 import { useChatStore } from '../../store/chat-store';
-import { useThemeStore } from '../../store/theme-store';
+import { EmojiPicker } from '../ui/EmojiPicker';
 import { ipc } from '../../lib/ipc-client';
 import type { Character } from '../../db/index';
 
@@ -22,7 +20,6 @@ const ERROR_MAP: Record<string, string> = {
 export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
   const isEdit = !!editCharacter;
   const apiKey = useAuthStore((s) => s.apiKey);
-  const theme = useThemeStore((s) => s.theme);
   const createCharacter = useChatStore((s) => s.createCharacter);
   const updateCharacter = useChatStore((s) => s.updateCharacter);
 
@@ -44,6 +41,9 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
   const [showFilePreview, setShowFilePreview] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [avatarDragOver, setAvatarDragOver] = useState(false);
+  const [parserMissing, setParserMissing] = useState(false);
+  const [isDownloadingParser, setIsDownloadingParser] = useState(false);
+  const pendingFileRef = useRef<File | null>(null);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -55,19 +55,37 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
   const canSave = name.trim().length >= 2 && systemPrompt.trim().length > 0;
 
   const processFile = async (file: File) => {
+    pendingFileRef.current = file;
     setSelectedFile({ name: file.name, path: file.name });
     setIsParsing(true);
     setParseError(null);
+    setParserMissing(false);
     setDocumentText(null);
 
     const result = await ipc.file.parse(file);
     setIsParsing(false);
 
-    if (result.error) {
+    if (result.error === 'parser:missing') {
+      setParserMissing(true);
+    } else if (result.error) {
       setParseError(result.error);
     } else if (result.text) {
       setDocumentText(result.text);
     }
+  };
+
+  const handleDownloadParser = async () => {
+    setIsDownloadingParser(true);
+    const result = await ipc.file.downloadParser();
+    setIsDownloadingParser(false);
+
+    if (result.error) {
+      setParseError(result.error);
+      return;
+    }
+    setParserMissing(false);
+    const file = pendingFileRef.current;
+    if (file) await processFile(file);
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -253,15 +271,11 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
             </button>
             {showEmojiPicker && (
               <div className="absolute top-full mt-2 z-20">
-                <Picker
-                  data={data}
-                  onEmojiSelect={(emoji: { native: string }) => {
-                    setAvatar(emoji.native);
+                <EmojiPicker
+                  onSelect={(emoji) => {
+                    setAvatar(emoji);
                     setShowEmojiPicker(false);
                   }}
-                  theme={theme}
-                  previewPosition="none"
-                  skinTonePosition="none"
                 />
               </div>
             )}
@@ -342,6 +356,20 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
 
             {parseError && (
               <p className="text-xs text-red-400">⚠️ 解析失败: {parseError}</p>
+            )}
+
+            {parserMissing && (
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-gray-400">首次导入 PDF/Word 需下载解析组件（约 4MB，仅需一次）。</p>
+                <button
+                  type="button"
+                  onClick={handleDownloadParser}
+                  disabled={isDownloadingParser}
+                  className="px-3 py-1.5 rounded-lg bg-gene-purple text-xs text-white hover:bg-[#5B4BD4] disabled:opacity-50 transition-colors shrink-0"
+                >
+                  {isDownloadingParser ? '下载中...' : '下载解析组件'}
+                </button>
+              </div>
             )}
 
             {documentText && !parseError && (

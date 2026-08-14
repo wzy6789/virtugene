@@ -10,6 +10,8 @@ const noop: VirtuGeneAPI = {
   },
   file: {
     parse: async () => ({ error: '未在 Electron 环境中运行' }),
+    parserReady: async () => ({ ready: false }),
+    downloadParser: async () => ({ error: '未在 Electron 环境中运行' }),
   },
   proactive: {
     generate: async () => ({ error: '未在 Electron 环境中运行' }),

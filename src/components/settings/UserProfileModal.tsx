@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import Picker from '@emoji-mart/react';
-import data from '@emoji-mart/data';
 import { Modal } from '../ui/Modal';
 import { Avatar } from '../ui/Avatar';
+import { EmojiPicker } from '../ui/EmojiPicker';
 import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
-import { useThemeStore } from '../../store/theme-store';
 import { userRepo } from '../../db/user-repo';
 
 interface Props {
@@ -17,7 +15,6 @@ export function UserProfileModal({ open, onClose }: Props) {
   const username = useAuthStore((s) => s.username);
   const avatar = useAuthStore((s) => s.avatar);
   const setAvatar = useAuthStore((s) => s.setAvatar);
-  const theme = useThemeStore((s) => s.theme);
 
   const [preview, setPreview] = useState(avatar ?? DEFAULT_USER_AVATAR);
   const [showEmoji, setShowEmoji] = useState(false);
@@ -95,18 +92,12 @@ export function UserProfileModal({ open, onClose }: Props) {
           {showEmoji ? '收起 emoji' : '选择 emoji 头像'}
         </button>
         {showEmoji && (
-          <div>
-            <Picker
-              data={data}
-              onEmojiSelect={(e: { native: string }) => {
-                setPreview(e.native);
-                setShowEmoji(false);
-              }}
-              theme={theme}
-              previewPosition="none"
-              skinTonePosition="none"
-            />
-          </div>
+          <EmojiPicker
+            onSelect={(emoji) => {
+              setPreview(emoji);
+              setShowEmoji(false);
+            }}
+          />
         )}
 
         <button

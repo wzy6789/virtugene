@@ -1,6 +1,6 @@
 {
   "name": "virtugene",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "description": "Unlock Your Digital Soul",
   "author": "VirtuGene",
@@ -11,17 +11,13 @@
     "dev": "concurrently -n electron,vite \"npm run dev:electron\" \"npm run dev:renderer\"",
     "build:electron": "node scripts/build-electron.mjs",
     "build:renderer": "vite build",
+    "build:parser": "node scripts/build-parser.mjs",
     "build": "npm run build:electron && npm run build:renderer",
     "package": "npm run build && electron-builder"
   },
   "dependencies": {
-    "@emoji-mart/data": "^1.2.1",
-    "@emoji-mart/react": "^1.1.1",
     "dexie": "^4.0.11",
     "electron-updater": "^6.8.9",
-    "emoji-mart": "^5.6.0",
-    "mammoth": "^1.12.1",
-    "pdf-parse": "^2.4.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.0.5"
@@ -35,6 +31,8 @@
     "electron": "^35.7.5",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.3",
+    "mammoth": "^1.12.1",
+    "pdf-parse": "^2.4.5",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
