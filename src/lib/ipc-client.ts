@@ -31,6 +31,12 @@ const noop: VirtuGeneAPI = {
     close: () => {},
     setSize: async () => false,
   },
+  app: {
+    getVersion: async () => '',
+  },
+  clipboard: {
+    writeText: async () => false,
+  },
   update: {
     check: async () => ({ error: '未在 Electron 环境中运行' }),
     download: async () => ({ error: '未在 Electron 环境中运行' }),

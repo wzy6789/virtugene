@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, clipboard } from 'electron';
 import path from 'path';
 import { registerKeyIPC } from './ipc/key';
 import { registerShellIPC } from './ipc/shell';
@@ -82,6 +82,13 @@ app.whenReady().then(() => {
     }
     win.setSize(width, height);
     win.center();
+    return true;
+  });
+
+  ipcMain.handle('app:getVersion', () => app.getVersion());
+
+  ipcMain.handle('clipboard:writeText', (_event, { text }: { text: string }) => {
+    clipboard.writeText(text);
     return true;
   });
 

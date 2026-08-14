@@ -103,3 +103,15 @@ html, body, #root {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Splash DNA helix — rungs contract to simulate rotation */
+@keyframes dnaRung {
+  0%, 100% { transform: scaleX(1); opacity: 1; }
+  50% { transform: scaleX(0.15); opacity: 0.35; }
+}
+
+.dna-rung {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dnaRung 1.8s ease-in-out infinite;
+}

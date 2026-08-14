@@ -5,6 +5,9 @@ import { ipc } from './lib/ipc-client';
 import { AuthPage } from './pages/AuthPage';
 import { ChatPage } from './pages/ChatPage';
 import { MainLayout } from './components/layout/MainLayout';
+import { SplashScreen } from './components/splash/SplashScreen';
+import { UpdateNotesModal } from './components/update/UpdateNotesModal';
+import { getChangelog, LAST_SEEN_VERSION_KEY } from './lib/changelog';
 import { initSeedCharacters } from './lib/seed-init';
 
 export default function App() {
@@ -12,10 +15,24 @@ export default function App() {
   const theme = useThemeStore((s) => s.theme);
   const didResize = useRef(false);
   const [ready, setReady] = useState(false);
+  const [updateNotes, setUpdateNotes] = useState<{ version: string; notes: string[] } | null>(null);
 
   useEffect(() => {
     initSeedCharacters().finally(() => setReady(true));
   }, []);
+
+  // Show the update announcement once per version change
+  useEffect(() => {
+    if (!ready) return;
+    ipc.app.getVersion().then((v) => {
+      if (!v) return;
+      const entry = getChangelog(v);
+      if (!entry) return;
+      if (localStorage.getItem(LAST_SEEN_VERSION_KEY) !== v) {
+        setUpdateNotes({ version: v, notes: entry.notes });
+      }
+    });
+  }, [ready]);
 
   // Apply theme class at the root so both auth and chat screens are themed
   useEffect(() => {
@@ -33,12 +50,15 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
+  const handleCloseUpdateNotes = () => {
+    if (updateNotes) {
+      localStorage.setItem(LAST_SEEN_VERSION_KEY, updateNotes.version);
+    }
+    setUpdateNotes(null);
+  };
+
   if (!ready) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-app">
-        <div className="text-4xl animate-pulse">🧬</div>
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   return (
@@ -50,6 +70,12 @@ export default function App() {
       ) : (
         <AuthPage />
       )}
+      <UpdateNotesModal
+        open={!!updateNotes}
+        onClose={handleCloseUpdateNotes}
+        version={updateNotes?.version ?? ''}
+        notes={updateNotes?.notes ?? []}
+      />
     </div>
   );
 }

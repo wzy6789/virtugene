@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { useAuthStore } from '../../store/auth-store';
 import { useChatStore } from '../../store/chat-store';
@@ -42,6 +42,14 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   // Delete account state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // App version
+  const [appVersion, setAppVersion] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    ipc.app.getVersion().then((v) => setAppVersion(v));
+  }, [open]);
 
   const handleStartReplace = () => {
     setIsReplacing(true);
@@ -208,7 +216,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             <div className="p-4 rounded-xl bg-surface border border-line space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400">当前版本</span>
-                <span className="text-sm text-ink font-mono">v1.0.1</span>
+                <span className="text-sm text-ink font-mono">{appVersion ? `v${appVersion}` : 'v...'}</span>
               </div>
 
               {updateStatus?.state === 'available' && (

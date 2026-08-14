@@ -74,6 +74,12 @@ interface VirtuGeneAPI {
     close: () => void;
     setSize: (width: number, height: number) => Promise<boolean>;
   };
+  app: {
+    getVersion: () => Promise<string>;
+  };
+  clipboard: {
+    writeText: (text: string) => Promise<boolean>;
+  };
   update: {
     check: () => Promise<{ version?: string | null; error?: string }>;
     download: () => Promise<{ ok?: boolean; error?: string }>;

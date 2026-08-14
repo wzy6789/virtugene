@@ -76,4 +76,10 @@ contextBridge.exposeInMainWorld('virtugene', {
     close: () => ipcRenderer.send('window:close'),
     setSize: (width: number, height: number) => ipcRenderer.invoke('window:setSize', { width, height }),
   },
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  },
+  clipboard: {
+    writeText: (text: string) => ipcRenderer.invoke('clipboard:writeText', { text }),
+  },
 });

@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useChatStore } from '../../store/chat-store';
 import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
 import { MessageBubble } from './MessageBubble';
@@ -45,7 +46,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
   const apiKey = useAuthStore((s) => s.apiKey);
   const userId = useAuthStore((s) => s.userId) ?? '';
   const userAvatar = useAuthStore((s) => s.avatar) ?? DEFAULT_USER_AVATAR;
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<ChatInputHandle>(null);
 
   const [sending, setSending] = useState(false);
@@ -53,9 +54,42 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
 
   const character = characters.find((c) => c.id === selectedCharacterId);
 
+  const rows = useMemo(() => {
+    const result: { key: string; divider: string | null; message: Message; avatar: string }[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const prev = messages[i - 1];
+      const showDivider = !prev || msg.createdAt - prev.createdAt > FIVE_MINUTES;
+      result.push({
+        key: msg.id,
+        divider: showDivider ? formatTimeLabel(msg.createdAt) : null,
+        message: msg,
+        avatar: msg.role === 'user' ? userAvatar : character?.avatar ?? '🧬',
+      });
+    }
+    return result;
+  }, [messages, userAvatar, character]);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 72,
+    overscan: 8,
+    getItemKey: (index) => rows[index].key,
+  });
+
+  // Keep pinned to the bottom on new messages / session switch
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (rows.length === 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    scrollToBottom();
+    const raf = requestAnimationFrame(scrollToBottom);
+    return () => cancelAnimationFrame(raf);
+  }, [rows.length]);
 
   const handleSend = async (text: string) => {
     const sessionId = currentSessionId;
@@ -188,31 +222,40 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       </div>
 
       {/* Messages — click anywhere to focus input, like WeChat */}
-      <div className="flex-1 overflow-y-auto px-4 py-3" onClick={() => inputRef.current?.focus()}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3" onClick={() => inputRef.current?.focus()}>
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <p className="text-xs text-gray-600">发送消息开始对话</p>
           </div>
         ) : (
-          messages.map((msg, i) => {
-            const prev = messages[i - 1];
-            const showDivider = !prev || (msg.createdAt - prev.createdAt) > FIVE_MINUTES;
-            return (
-              <Fragment key={msg.id}>
-                {showDivider && (
-                  <div className="flex justify-center my-3">
-                    <span className="text-xs text-gray-500 bg-panel px-3 py-0.5 rounded-full">
-                      {formatTimeLabel(msg.createdAt)}
-                    </span>
-                  </div>
-                )}
-                <MessageBubble
-                  message={msg}
-                  avatar={msg.role === 'user' ? userAvatar : character?.avatar ?? '🧬'}
-                />
-              </Fragment>
-            );
-          })
+          <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+            {virtualizer.getVirtualItems().map((vi) => {
+              const row = rows[vi.index];
+              return (
+                <div
+                  key={row.key}
+                  data-index={vi.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${vi.start}px)`,
+                  }}
+                >
+                  {row.divider && (
+                    <div className="flex justify-center my-3">
+                      <span className="text-xs text-gray-500 bg-panel px-3 py-0.5 rounded-full">
+                        {row.divider}
+                      </span>
+                    </div>
+                  )}
+                  <MessageBubble message={row.message} avatar={row.avatar} />
+                </div>
+              );
+            })}
+          </div>
         )}
         {sending && (
           <div className="flex justify-start mb-4">
@@ -225,7 +268,6 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
             </div>
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       <BalanceBanner error={error} />
