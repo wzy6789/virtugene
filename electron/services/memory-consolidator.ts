@@ -50,8 +50,9 @@ export async function extractMemories(params: ConsolidateParams): Promise<Consol
     }
 
     const data = await response.json();
-    const text: string = data.choices[0].message.content;
-    console.log('[memory-consolidator] finish_reason:', data.choices[0]?.finish_reason, '| completion_tokens:', data.usage?.completion_tokens);
+    const choice = data.choices?.[0];
+    const text: string = choice?.message?.content ?? '';
+    console.log('[memory-consolidator] finish_reason:', choice?.finish_reason, '| completion_tokens:', data.usage?.completion_tokens);
     console.log('[memory-consolidator] raw response:', JSON.stringify(text));
 
     // Parse JSON from response

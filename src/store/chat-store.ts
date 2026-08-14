@@ -34,7 +34,7 @@ interface ChatState {
   updateCharacter: (id: string, updates: Partial<Character>) => Promise<void>;
   deleteCharacterWithSessions: (id: string) => Promise<void>;
   deleteCharacter: (id: string) => Promise<void>;
-  clearAllData: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   triggerProactive: () => Promise<void>;
   reset: () => void;
 }
@@ -96,9 +96,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadCharacters: async () => {
     const userId = useAuthStore.getState().userId ?? '';
     const all = await characterRepo.getAll();
-    // Show: presets + published (others') + own custom characters
+    // Sidebar shows only presets + own custom characters. Others' published
+    // characters are discoverable/clonable in the gene pool, not pushed here.
     const visible = all.filter(
-      (c) => c.isPreset || c.published || c.createdBy === userId,
+      (c) => c.isPreset || c.createdBy === userId,
     );
     const previews: Record<string, CharPreview | null> = {};
     const unreadCounts: Record<string, number> = {};
@@ -302,17 +303,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const userId = useAuthStore.getState().userId ?? '';
     const sessions = await sessionRepo.getByCharacter(id, userId);
     for (const s of sessions) {
+      await emotionRepo.deleteBySession(s.id);
       await sessionRepo.deleteById(s.id);
     }
     await characterRepo.deleteById(id);
     await memoryRepo.clearForCharacter(id, userId);
-    await emotionRepo.deleteByCharacter(id);
     await stateRepo.deleteByCharacter(id, userId);
 
     const { selectedCharacterId } = get();
     const all = await characterRepo.getAll();
     const visible = all.filter(
-      (c) => c.isPreset || c.published || c.createdBy === userId,
+      (c) => c.isPreset || c.createdBy === userId,
     );
     const previews: Record<string, CharPreview | null> = {};
     for (const c of visible) {
@@ -329,14 +330,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  clearAllData: async () => {
-    await db.users.clear();
-    await db.characters.clear();
-    await db.sessions.clear();
-    await db.messages.clear();
-    await db.memories.clear();
-    await db.emotionSnapshots.clear();
-    await db.characterStates.clear();
+  deleteAccount: async () => {
+    const userId = useAuthStore.getState().userId ?? '';
+
+    // Delete this user's sessions along with their messages + emotion snapshots
+    const sessions = await db.sessions.where('userId').equals(userId).toArray();
+    for (const s of sessions) {
+      await emotionRepo.deleteBySession(s.id);
+      await sessionRepo.deleteById(s.id);
+    }
+
+    // Delete this user's memories, relationship state, and custom characters
+    await db.memories.where('userId').equals(userId).delete();
+    const states = await db.characterStates.toArray();
+    for (const st of states) {
+      if (st.userId === userId) {
+        await db.characterStates.delete([st.characterId, st.userId]);
+      }
+    }
+    await db.characters.where('createdBy').equals(userId).delete();
+    await db.users.delete(userId);
+
     set({
       selectedCharacterId: null,
       currentSessionId: null,

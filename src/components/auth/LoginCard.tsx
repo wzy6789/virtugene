@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ipc } from '../../lib/ipc-client';
 import { hashPassword, decryptApiKey } from '../../lib/crypto';
 import { userRepo } from '../../db/user-repo';
-import { useAuthStore } from '../../store/auth-store';
+import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
 
 interface Props {
   onSwitch: () => void;
@@ -46,7 +46,7 @@ export function LoginCard({ onSwitch }: Props) {
         saltBytes
       );
 
-      login(user.id, user.username, key);
+      login(user.id, user.username, key, user.avatar ?? DEFAULT_USER_AVATAR);
       ipc.window.setSize(1200, 800);
     } catch {
       setError('唤醒数字灵魂失败，请重试');

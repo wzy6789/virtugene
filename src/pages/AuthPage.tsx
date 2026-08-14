@@ -26,31 +26,13 @@ export function AuthPage() {
           <div className="absolute bottom-1/3 -right-20 w-48 h-48 bg-life-cyan/5 rounded-full blur-3xl" />
         </div>
 
-        {/* Card */}
-        <div className="relative z-10 glass-card rounded-xl px-4 py-8 w-[300px]">
+        {/* Card — no frame; form floats over the glow background (WeChat style) */}
+        <div className="relative z-10 px-4 py-8 w-[320px]">
           {mode === 'login' ? (
             <LoginCard onSwitch={() => setMode('register')} />
           ) : (
             <RegisterCard onSwitch={() => setMode('login')} />
           )}
-
-          {/* Dev reset */}
-          <div className="mt-6 pt-4 border-t border-line text-center">
-            <button
-              onClick={async () => {
-                localStorage.clear();
-                await new Promise((ok) => {
-                  const r = indexedDB.deleteDatabase('virtugene');
-                  r.onsuccess = () => ok(undefined);
-                  r.onerror = () => ok(undefined);
-                });
-                window.location.reload();
-              }}
-              className="text-[10px] text-gray-600 hover:text-red-400 transition-colors"
-            >
-              重置所有数据
-            </button>
-          </div>
         </div>
       </div>
     </div>

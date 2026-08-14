@@ -42,8 +42,4 @@ export const emotionRepo = {
   async deleteBySession(sessionId: string): Promise<void> {
     await db.emotionSnapshots.where('sessionId').equals(sessionId).delete();
   },
-
-  async deleteByCharacter(characterId: string): Promise<void> {
-    await db.emotionSnapshots.where('characterId').equals(characterId).delete();
-  },
 };

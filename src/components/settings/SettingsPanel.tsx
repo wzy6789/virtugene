@@ -21,7 +21,7 @@ function maskKey(apiKey: string): string {
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { userId, username, apiKey, setApiKey, logout } = useAuthStore();
-  const clearAllData = useChatStore((s) => s.clearAllData);
+  const deleteAccount = useChatStore((s) => s.deleteAccount);
   const updateStatus = useUpdateStore((s) => s.status);
   const updateChecking = useUpdateStore((s) => s.checking);
   const checkUpdate = useUpdateStore((s) => s.check);
@@ -110,7 +110,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
-    await clearAllData();
+    await deleteAccount();
     useCharacterStateStore.getState().clear();
     useEmotionStore.getState().clearCurrent();
     localStorage.clear();

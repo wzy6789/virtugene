@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../store/chat-store';
-import { useAuthStore } from '../../store/auth-store';
+import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import type { ChatInputHandle } from './ChatInput';
@@ -44,6 +44,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
   const addMessage = useChatStore((s) => s.addMessage);
   const apiKey = useAuthStore((s) => s.apiKey);
   const userId = useAuthStore((s) => s.userId) ?? '';
+  const userAvatar = useAuthStore((s) => s.avatar) ?? DEFAULT_USER_AVATAR;
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<ChatInputHandle>(null);
 
@@ -205,7 +206,10 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
                     </span>
                   </div>
                 )}
-                <MessageBubble message={msg} />
+                <MessageBubble
+                  message={msg}
+                  avatar={msg.role === 'user' ? userAvatar : character?.avatar ?? '🧬'}
+                />
               </Fragment>
             );
           })

@@ -3,6 +3,7 @@ import Dexie, { type Table } from 'dexie';
 export interface User {
   id: string;
   username: string;
+  avatar?: string;
   passwordHash: string;
   passwordSalt: string;
   apiKeyIv: string;

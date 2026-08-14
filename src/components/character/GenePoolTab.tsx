@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useChatStore } from '../../store/chat-store';
 import { useAuthStore } from '../../store/auth-store';
+import { characterRepo } from '../../db/character-repo';
 import type { Character } from '../../db/index';
 
 interface GenePoolTabProps {
@@ -29,21 +30,38 @@ function getBadge(char: Character, userId: string) {
 export function GenePoolTab({ onSelect }: GenePoolTabProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterTab>('all');
-  const characters = useChatStore((s) => s.characters);
+  const [poolCharacters, setPoolCharacters] = useState<Character[]>([]);
   const selectedCharacterId = useChatStore((s) => s.selectedCharacterId);
   const selectCharacter = useChatStore((s) => s.selectCharacter);
+  const createCharacter = useChatStore((s) => s.createCharacter);
   const userId = useAuthStore((s) => s.userId) ?? '';
+
+  // The gene pool is independent of the sidebar: it also surfaces others'
+  // published characters (which are hidden from the left sidebar).
+  useEffect(() => {
+    let alive = true;
+    characterRepo.getAll().then((all) => {
+      if (alive) setPoolCharacters(all);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const poolBase = poolCharacters.filter(
+    (c) => c.isPreset || c.published || c.createdBy === userId,
+  );
 
   const preFiltered = (() => {
     switch (filter) {
       case 'preset':
-        return characters.filter((c) => c.isPreset);
+        return poolBase.filter((c) => c.isPreset);
       case 'shared':
-        return characters.filter((c) => c.published && !c.isPreset && c.createdBy !== userId);
+        return poolBase.filter((c) => c.published && !c.isPreset && c.createdBy !== userId);
       case 'mine':
-        return characters.filter((c) => c.createdBy === userId && !c.isPreset);
+        return poolBase.filter((c) => c.createdBy === userId && !c.isPreset);
       default:
-        return characters;
+        return poolBase;
     }
   })();
 
@@ -54,9 +72,25 @@ export function GenePoolTab({ onSelect }: GenePoolTabProps) {
       c.systemPrompt.includes(query),
   );
 
-  const handleSelect = (character: Character) => {
-    selectCharacter(character.id);
-    onSelect(character);
+  const handleSelect = async (character: Character) => {
+    const isShared = character.published && !character.isPreset && character.createdBy !== userId;
+    if (isShared) {
+      // Clone a shared gene into a private copy owned by the current user.
+      const clone = await createCharacter({
+        name: character.name,
+        avatar: character.avatar,
+        systemPrompt: character.systemPrompt,
+        tags: character.tags,
+        isPreset: false,
+        isCustom: true,
+        published: false,
+        createdBy: userId,
+      });
+      onSelect(clone);
+    } else {
+      await selectCharacter(character.id);
+      onSelect(character);
+    }
   };
 
   return (
@@ -107,6 +141,7 @@ export function GenePoolTab({ onSelect }: GenePoolTabProps) {
         <div className="grid grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto pr-1">
           {filtered.map((char) => {
             const isSelected = char.id === selectedCharacterId;
+            const isShared = char.published && !char.isPreset && char.createdBy !== userId;
             const badge = getBadge(char, userId);
             return (
               <button
@@ -144,6 +179,11 @@ export function GenePoolTab({ onSelect }: GenePoolTabProps) {
                         </span>
                       ))}
                     </div>
+                    {isShared && (
+                      <span className="inline-block mt-2 text-[10px] text-life-cyan">
+                        ⧉ 点击克隆到我的基因
+                      </span>
+                    )}
                   </div>
                 </div>
               </button>
