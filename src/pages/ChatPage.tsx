@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { ChatWindow } from '../components/chat/ChatWindow';
 import { EmotionPanel } from '../components/chat/EmotionPanel';
 import { EmotionToggleButton } from '../components/chat/EmotionToggleButton';
+import { RelationMilestoneToast } from '../components/chat/RelationMilestoneToast';
 import { useChatStore } from '../store/chat-store';
 import { useAuthStore } from '../store/auth-store';
 import { useEmotionStore } from '../store/emotion-store';
@@ -86,6 +87,7 @@ export function ChatPage() {
         <ChatWindow emotionToggle={emotionToggle} />
       </div>
       <EmotionPanel />
+      <RelationMilestoneToast />
     </div>
   );
 }

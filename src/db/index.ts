@@ -24,6 +24,19 @@ export interface Character {
   createdAt: number;
   /** 主动倾向 0-1，决定该角色是否会主动发消息及频率 */
   proactivity: number;
+  /** 一句话签名 */
+  signature: string;
+  /** 示例开场白（TA 主动开口说的第一句话） */
+  greeting: string;
+  /** 克隆自哪个预设的 id（用于「添加到我」去重） */
+  sourcePresetId?: string;
+  /** 是否置顶（侧边栏会话列表，仅用户自有角色使用） */
+  pinned?: boolean;
+}
+
+export interface RelationMilestone {
+  level: string;
+  reachedAt: number;
 }
 
 export interface CharacterState {
@@ -31,6 +44,7 @@ export interface CharacterState {
   userId: string;
   affinity: number;
   mood: number;
+  milestones: RelationMilestone[];
   updatedAt: number;
 }
 
@@ -51,6 +65,10 @@ export interface Message {
   content: string;
   createdAt: number;
   isProactive: boolean;
+  /** 引用回复的目标消息 id */
+  replyToId?: string;
+  /** 引用回复的目标消息内容（用于气泡内展示） */
+  replyToContent?: string;
 }
 
 export interface MemoryItem {
@@ -180,6 +198,35 @@ export class VirtuGeneDB extends Dexie {
       memories: 'id,characterId,userId,createdAt',
       emotionSnapshots: 'id,sessionId,characterId,createdAt',
       characterStates: '[characterId+userId]',
+    });
+    this.version(10).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,userId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+      memories: 'id,characterId,userId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+      characterStates: '[characterId+userId]',
+    }).upgrade(async (tx) => {
+      await tx.table('characters').toCollection().modify((char) => {
+        char.signature = char.signature ?? '';
+        char.greeting = char.greeting ?? '';
+      });
+    });
+    this.version(11).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,userId,updatedAt',
+      messages: 'id,sessionId,createdAt',
+      memories: 'id,characterId,userId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+      characterStates: '[characterId+userId]',
+    }).upgrade(async (tx) => {
+      // 关系系统：好感度改为 0 起步，并初始化里程碑数组
+      await tx.table('characterStates').toCollection().modify((st) => {
+        st.milestones = st.milestones ?? [];
+        st.affinity = 0;
+      });
     });
   }
 }

@@ -10,13 +10,26 @@ import { CharacterAddModal } from '../character/CharacterAddModal';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { UserProfileModal } from '../settings/UserProfileModal';
 import { Avatar } from '../ui/Avatar';
+import { useResizable } from '../../hooks/useResizable';
+
+const SIDEBAR_COLLAPSED = 64;
+const SIDEBAR_DEFAULT = 240;
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 320;
+const SIDEBAR_SNAP = 140;
 
 export function Sidebar() {
   const { theme, toggle } = useThemeStore();
   const logout = useAuthStore((s) => s.logout);
   const avatar = useAuthStore((s) => s.avatar) ?? DEFAULT_USER_AVATAR;
   const username = useAuthStore((s) => s.username);
-  const [collapsed, setCollapsed] = useState(false);
+  const { width, setWidth, isDragging, startDrag } = useResizable({
+    initial: SIDEBAR_DEFAULT,
+    min: SIDEBAR_COLLAPSED,
+    max: SIDEBAR_MAX,
+    snap: (w) => (w < SIDEBAR_SNAP ? SIDEBAR_COLLAPSED : Math.max(SIDEBAR_MIN, w)),
+  });
+  const collapsed = width < SIDEBAR_SNAP;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -28,10 +41,15 @@ export function Sidebar() {
   return (
     <>
       <aside
-        className={`h-full bg-app border-r border-line flex flex-col shrink-0 transition-all duration-300 ${
-          collapsed ? 'w-16' : 'w-60'
+        className={`relative h-full bg-app border-r border-line flex flex-col shrink-0 ${
+          isDragging ? '' : 'transition-[width] duration-300 ease-in-out'
         }`}
+        style={{ width }}
       >
+        <div
+          onMouseDown={startDrag}
+          className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-gene-purple/30 transition-colors z-10"
+        />
         {/* Logo */}
         <div className="h-14 flex items-center gap-3 px-4 border-b border-line shrink-0">
           <span className="text-2xl shrink-0">🧬</span>
@@ -95,7 +113,7 @@ export function Sidebar() {
           </button>
 
           <button
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => setWidth(collapsed ? SIDEBAR_DEFAULT : SIDEBAR_COLLAPSED)}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-surface transition-colors"
           >
             <span className="text-lg shrink-0">{collapsed ? '▶' : '◀'}</span>

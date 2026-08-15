@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useChatStore } from '../../store/chat-store';
 import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
+import { useEmotionStore } from '../../store/emotion-store';
 import { MessageBubble } from './MessageBubble';
+import { Avatar } from '../ui/Avatar';
 import { ChatInput } from './ChatInput';
 import type { ChatInputHandle } from './ChatInput';
 import { BalanceBanner, type ChatError } from './BalanceBanner';
@@ -43,6 +45,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
   const selectedCharacterId = useChatStore((s) => s.selectedCharacterId);
   const characters = useChatStore((s) => s.characters);
   const addMessage = useChatStore((s) => s.addMessage);
+  const deleteMessage = useChatStore((s) => s.deleteMessage);
   const apiKey = useAuthStore((s) => s.apiKey);
   const userId = useAuthStore((s) => s.userId) ?? '';
   const userAvatar = useAuthStore((s) => s.avatar) ?? DEFAULT_USER_AVATAR;
@@ -51,8 +54,24 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
 
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<ChatError>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   const character = characters.find((c) => c.id === selectedCharacterId);
+
+  // Clear the reply banner when switching conversations
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [currentSessionId]);
+
+  // Focus the input when switching characters so the user can type immediately
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [selectedCharacterId]);
+
+  // Re-focus after sending finishes so the user can keep typing without clicking
+  useEffect(() => {
+    if (!sending) inputRef.current?.focus();
+  }, [sending]);
 
   const rows = useMemo(() => {
     const result: { key: string; divider: string | null; message: Message; avatar: string }[] = [];
@@ -97,6 +116,11 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
 
     setError(null);
 
+    const replyTarget = replyingTo;
+    const apiMessage = replyTarget
+      ? `（你在引用这条消息：「${replyTarget.content}」）\n${text}`
+      : text;
+
     // Save user message
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -105,10 +129,12 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       content: text,
       createdAt: Date.now(),
       isProactive: false,
+      ...(replyTarget ? { replyToId: replyTarget.id, replyToContent: replyTarget.content } : {}),
     };
     await messageRepo.create(userMsg);
     addMessage(userMsg);
     await sessionRepo.touch(sessionId);
+    setReplyingTo(null);
 
     // Build history from last messages
     const allMsgs = useChatStore.getState().messages;
@@ -132,14 +158,21 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
     const enrichedPrompt = character.systemPrompt + memoryContext + relationshipContext;
 
     // Call DeepSeek
+    const startedAt = Date.now();
     setSending(true);
     try {
       const result = await ipc.chat.send({
         apiKey,
         systemPrompt: enrichedPrompt,
-        message: text,
+        message: apiMessage,
         history,
       });
+
+      // 保证「对方正在输入…」至少展示约 0.7s，避免秒回一闪而过
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 700) {
+        await new Promise((r) => setTimeout(r, 700 - elapsed));
+      }
 
       if (result.error) {
         setError(result.error as ChatError);
@@ -165,6 +198,12 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
         const userMsgCount = allMsgs.filter((m) => m.role === 'user').length + 1; // +1 for the just-sent message
         if (userMsgCount > 0 && userMsgCount % 10 === 0) {
           consolidateMemories(sessionId, character.id);
+        }
+
+        // Trigger relationship settlement every 3 user messages
+        const settledCount = allMsgs.filter((m) => m.role === 'user').length;
+        if (settledCount > 0 && settledCount % 3 === 0) {
+          void useEmotionStore.getState().settle(character.id, sessionId, character.name);
         }
       }
     } catch {
@@ -251,15 +290,23 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
                       </span>
                     </div>
                   )}
-                  <MessageBubble message={row.message} avatar={row.avatar} />
+                  <MessageBubble
+                    message={row.message}
+                    avatar={row.avatar}
+                    animate={Date.now() - row.message.createdAt < 800}
+                    onQuote={setReplyingTo}
+                    onDelete={(m) => void deleteMessage(m.id)}
+                  />
                 </div>
               );
             })}
           </div>
         )}
         {sending && (
-          <div className="flex justify-start mb-4">
-            <div className="bg-msgai text-gray-400 text-sm px-4 py-3 rounded-2xl rounded-bl-md border-l-2 border-life-cyan">
+          <div className="flex items-start gap-2 mb-4 animate-message-in">
+            <Avatar avatar={character?.avatar ?? '🧬'} size="sm" />
+            <div className="bg-msgai text-gray-400 text-sm px-4 py-3 rounded-2xl rounded-bl-md border-l-2 border-life-cyan flex items-center gap-1.5">
+              <span>对方正在输入</span>
               <span className="inline-flex gap-1">
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -271,6 +318,24 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       </div>
 
       <BalanceBanner error={error} />
+
+      {/* Reply banner */}
+      {replyingTo && (
+        <div className="flex items-center gap-2 px-4 py-2 border-t border-line bg-panel">
+          <span className="text-xs text-life-cyan">引用</span>
+          <span className="text-xs text-gray-500 flex-1 truncate">{replyingTo.content}</span>
+          <button
+            onClick={() => setReplyingTo(null)}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-ink hover:bg-surface transition-colors"
+            title="取消引用"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <ChatInput ref={inputRef} onSend={handleSend} disabled={sending} />
     </div>
   );

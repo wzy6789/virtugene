@@ -4,9 +4,18 @@ const MESSAGING_INSTRUCTION =
   '- 禁止堆砌辞藻：不要用生僻字、四字成语连发、华丽书面语、散文腔。平实直接地说，别拽文\n' +
   '- 长度由你的性格决定：话痨可以多发几句，高冷可以只说一两个字。但无论如何，这是发短信不是写文章，不要长篇大论\n' +
   '- 不要分点列举，不要说"当然可以"、"你好！"之类的废话。直接说事\n' +
-  '- 禁止使用括号描述动作或表情（如（笑）、（挑眉）、（叹气）等），真人发微信不会这样写\n' +
+  '- 绝对禁止用括号写任何动作、表情或心理描写（如（笑）（愣）（叹气）），一个字都不行，真人发微信从不这样写\n' +
   '- 如果情绪需要或内容适合分开发送，可以用 "---" 分隔多条消息（最多 3 条）。说完一件事后想再补一句吐槽，或者表达连续的想法，适合分条。一般回复只发一条就好，不要强行分条\n' +
   '- 严守人设与知识边界，不要退化成通用问答机器人：只回答符合你身份、你擅长、你会关心的话题。若被问到与你无关或你根本不懂的事，用你的性格拒绝、反呛或岔开（比如"这我可不懂""你为什么会问我这个"），而不是一本正经地给出标准答案';
+
+function stripRoleplayActions(text: string): string {
+  return text
+    .replace(/（[^（）]*）/g, '')
+    .replace(/\([^()]*\)/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 export async function validateApiKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
   const response = await fetch('https://api.deepseek.com/v1/models', {
@@ -67,7 +76,7 @@ export async function sendMessage(params: ChatParams): Promise<ChatResult> {
 
   if (response.ok) {
     const data = await response.json();
-    return { content: data.choices[0].message.content };
+    return { content: stripRoleplayActions(data.choices[0].message.content) };
   }
 
   if (response.status === 401) {

@@ -92,6 +92,16 @@ html, body, #root {
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Message bubble arrival animation */
+@keyframes messageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-message-in {
+  animation: messageIn 0.18s ease-out;
+}
+
 /* Emotion chart polygon appear */
 @keyframes chartAppear {
   from { opacity: 0; transform-origin: center; transform: scale(0.5); }
@@ -114,4 +124,43 @@ html, body, #root {
   transform-box: fill-box;
   transform-origin: center;
   animation: dnaRung 1.8s ease-in-out infinite;
+}
+
+/* Relation milestone toast — slide in + spring overshoot + glow */
+@keyframes milestoneIn {
+  0% { opacity: 0; transform: translateY(-24px) scale(0.7); }
+  60% { opacity: 1; transform: translateY(0) scale(1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes milestoneGlow {
+  0%, 100% { box-shadow: 0 0 16px rgba(108, 92, 231, 0.35), 0 0 32px rgba(0, 206, 201, 0.12); }
+  50% { box-shadow: 0 0 28px rgba(108, 92, 231, 0.55), 0 0 56px rgba(0, 206, 201, 0.28); }
+}
+
+@keyframes milestoneParticle {
+  0% { transform: translateY(0) scale(1); opacity: 0.9; }
+  100% { transform: translateY(-24px) scale(0); opacity: 0; }
+}
+
+.milestone-toast {
+  animation: milestoneIn 0.5s cubic-bezier(0.22, 1, 0.36, 1), milestoneGlow 2.8s ease-in-out;
+}
+
+.milestone-level {
+  background: linear-gradient(90deg, #6C5CE7, #00CEC9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.milestone-particle {
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #00CEC9;
+  animation: milestoneParticle 1.6s ease-out infinite;
+  pointer-events: none;
 }

@@ -10,6 +10,15 @@ const PROACTIVE_INSTRUCTION =
   '- 不要用括号描述动作或表情\n' +
   '- 直接输出消息正文，不要任何前缀或后缀';
 
+function stripRoleplayActions(text: string): string {
+  return text
+    .replace(/（[^（）]*）/g, '')
+    .replace(/\([^()]*\)/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export interface ProactiveMessageParams {
   apiKey: string;
   systemPrompt: string;
@@ -64,7 +73,7 @@ export async function generateProactiveMessage(params: ProactiveMessageParams): 
 
     if (response.ok) {
       const data = await response.json();
-      return data.choices[0].message.content.trim();
+      return stripRoleplayActions(data.choices[0].message.content.trim());
     }
 
     console.error('[proactive] API error:', response.status);

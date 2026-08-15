@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import { useAuthStore } from './auth-store';
 import { useChatStore } from './chat-store';
+import { useCharacterStateStore } from './character-state-store';
 import { messageRepo } from '../db/message-repo';
 import { emotionRepo } from '../db/emotion-repo';
+import { stateRepo } from '../db/state-repo';
 import { ipc } from '../lib/ipc-client';
+import { computeAffinityDelta } from '../lib/affinity';
 import type { EmotionSnapshot } from '../db/index';
 
 interface EmotionState {
@@ -18,6 +21,7 @@ interface EmotionState {
   closePanel: () => void;
   analyzeCurrentSession: (characterId: string, sessionId: string, characterName: string) => Promise<void>;
   loadSessionSnapshots: (sessionId: string) => Promise<void>;
+  settle: (characterId: string, sessionId: string, characterName: string) => Promise<void>;
   clearCurrent: () => void;
 }
 
@@ -112,4 +116,54 @@ export const useEmotionStore = create<EmotionState>((set, get) => ({
   },
 
   clearCurrent: () => set({ currentSnapshot: null, previousSnapshot: null, snapshots: [], analysisError: null }),
+
+  settle: async (characterId, sessionId, characterName) => {
+    const apiKey = useAuthStore.getState().apiKey;
+    if (!apiKey) return;
+
+    const msgs = await messageRepo.getBySession(sessionId);
+    if (msgs.filter((m) => m.role === 'user').length < 3) return;
+
+    const history = msgs.slice(-30).map((m) => ({ role: m.role, content: m.content }));
+    const result = await ipc.emotion.analyze({ apiKey, history, characterName });
+    if (result.error || !result.dimensions) return;
+
+    const dims = result.dimensions;
+    const snapshot: EmotionSnapshot = {
+      id: crypto.randomUUID(),
+      characterId,
+      sessionId,
+      dimensions: dims,
+      dominantEmotion: result.dominantEmotion ?? '未知',
+      summary: result.summary ?? '',
+      messageCount: msgs.length,
+      createdAt: Date.now(),
+    };
+    await emotionRepo.create(snapshot);
+
+    const userId = useAuthStore.getState().userId ?? '';
+    const delta = computeAffinityDelta(dims);
+    const { state, upgraded } = await stateRepo.settle(
+      characterId,
+      userId,
+      delta,
+      Math.round(dims.valence * 10),
+    );
+
+    const csStore = useCharacterStateStore.getState();
+    if (csStore.characterId === characterId) {
+      useCharacterStateStore.setState({ affinity: state.affinity, mood: state.mood, milestones: state.milestones });
+    }
+    useCharacterStateStore.setState((s) => ({
+      affinityByCharacter: { ...s.affinityByCharacter, [characterId]: state.affinity },
+    }));
+    if (upgraded) {
+      useCharacterStateStore.setState({ milestone: upgraded });
+    }
+
+    // 若情绪面板正开着且在看当前会话，刷新快照（含新的折线点）
+    if (get().isPanelOpen && useChatStore.getState().currentSessionId === sessionId) {
+      await get().loadSessionSnapshots(sessionId);
+    }
+  },
 }));

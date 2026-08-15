@@ -7,9 +7,10 @@ interface ModalProps {
   title?: string;
   children: React.ReactNode;
   width?: string;
+  closeOnBackdrop?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: ModalProps) {
+export function Modal({ open, onClose, title, children, width = 'max-w-lg', closeOnBackdrop = true }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: Mo
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
+        if (closeOnBackdrop && e.target === overlayRef.current) onClose();
       }}
     >
       <div

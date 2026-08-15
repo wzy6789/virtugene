@@ -3,7 +3,14 @@ import { useEmotionStore } from '../../store/emotion-store';
 import { useChatStore } from '../../store/chat-store';
 import { useCharacterStateStore } from '../../store/character-state-store';
 import { EmotionChart } from './EmotionChart';
+import { EmotionCurve } from './EmotionCurve';
+import { getRelationLevel, levelProgress } from '../../lib/affinity';
+import { useResizable } from '../../hooks/useResizable';
 import type { EmotionDimensions } from '../../db/index';
+
+const PANEL_DEFAULT = 280;
+const PANEL_MIN = 260;
+const PANEL_MAX = 400;
 
 const DIM_LABELS: { key: keyof EmotionDimensions; label: string }[] = [
   { key: 'valence', label: '愉悦度' },
@@ -61,8 +68,22 @@ export function EmotionPanel() {
   const messages = useChatStore((s) => s.messages);
   const affinity = useCharacterStateStore((s) => s.affinity);
   const mood = useCharacterStateStore((s) => s.mood);
+  const milestones = useCharacterStateStore((s) => s.milestones);
+
+  const { width, startDrag } = useResizable({
+    initial: PANEL_DEFAULT,
+    min: PANEL_MIN,
+    max: PANEL_MAX,
+    reverse: true,
+  });
 
   const character = characters.find((c) => c.id === selectedCharacterId);
+
+  const relation = getRelationLevel(affinity);
+  const progress = levelProgress(affinity, relation.level, relation.next);
+  const daysKnown = messages.length > 0
+    ? Math.max(1, Math.floor((Date.now() - messages[0].createdAt) / 86400000) + 1)
+    : 0;
 
   // Load snapshots when session changes
   useEffect(() => {
@@ -86,10 +107,16 @@ export function EmotionPanel() {
 
   return (
     <div
-      className="h-full flex flex-col bg-app border-l border-line shrink-0 overflow-hidden transition-all duration-300"
-      style={{ width: isPanelOpen ? 280 : 0, opacity: isPanelOpen ? 1 : 0 }}
+      className="relative h-full flex flex-col bg-app border-l border-line shrink-0 overflow-hidden"
+      style={{ width: isPanelOpen ? width : 0, opacity: isPanelOpen ? 1 : 0 }}
     >
-      <div className="flex flex-col h-full" style={{ minWidth: 280 }}>
+      {isPanelOpen && (
+        <div
+          onMouseDown={startDrag}
+          className="absolute inset-y-0 left-0 w-1.5 cursor-col-resize hover:bg-gene-purple/30 transition-colors z-10"
+        />
+      )}
+      <div className="flex flex-col h-full" style={{ minWidth: width }}>
         {/* Header */}
         <div className="h-12 flex items-center justify-between px-4 border-b border-line shrink-0">
           <span className="text-sm font-medium text-ink">
@@ -108,33 +135,80 @@ export function EmotionPanel() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {/* 好感度 / 心情 */}
+          {/* 关系档案 */}
           <div className="rounded-xl bg-surface border border-line p-3 space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-gray-500">好感度</span>
-                <span className="text-xs tabular-nums text-gray-400">{Math.round(affinity)}</span>
+            {/* 等级名 + 说明 */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-lg font-bold milestone-level">{relation.level.name}</span>
+                <span className="text-xs text-gray-500 truncate">{relation.level.desc}</span>
               </div>
-              <div className="h-1.5 rounded-full bg-surface overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gene-purple transition-all duration-500"
-                  style={{ width: `${affinity}%` }}
-                />
+              <span className="text-xs tabular-nums text-gray-400 shrink-0">{Math.round(affinity)}/100</span>
+            </div>
+
+            {/* 到下一级进度 */}
+            {relation.next ? (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-gray-500">距离「{relation.next.name}」</span>
+                  <span className="text-[10px] tabular-nums text-gray-400">{Math.round(progress)}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-gene-purple to-life-cyan transition-all duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-gray-500">已达最高等级，灵魂同频</div>
+            )}
+
+            {/* 里程碑时间线 */}
+            {milestones.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">关系里程碑</p>
+                <div className="space-y-0.5">
+                  {milestones.map((m) => (
+                    <div key={m.reachedAt} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">进阶为「{m.level}」</span>
+                      <span className="text-gray-400 tabular-nums">{formatTime(m.reachedAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 对话统计 */}
+            <div className="grid grid-cols-3 gap-1 pt-2 border-t border-line">
+              <div className="text-center">
+                <div className="text-sm font-semibold tabular-nums text-ink">{messages.length}</div>
+                <div className="text-[10px] text-gray-500">消息</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-semibold tabular-nums text-ink">{daysKnown}</div>
+                <div className="text-[10px] text-gray-500">相识天数</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-semibold tabular-nums text-ink">{snapshots.length}</div>
+                <div className="text-[10px] text-gray-500">情绪图谱</div>
               </div>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-gray-500">心情</span>
-                <span className="text-xs tabular-nums" style={{ color: moodColor(mood) }}>
-                  {Math.round(mood)}
-                </span>
-              </div>
-              <div className="h-1.5 rounded-full bg-surface overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${mood}%`, backgroundColor: moodColor(mood) }}
-                />
-              </div>
+          </div>
+
+          {/* 心情 */}
+          <div className="rounded-xl bg-surface border border-line p-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-gray-500">心情</span>
+              <span className="text-xs tabular-nums" style={{ color: moodColor(mood) }}>
+                {Math.round(mood)}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${mood}%`, backgroundColor: moodColor(mood) }}
+              />
             </div>
           </div>
 
@@ -190,6 +264,14 @@ export function EmotionPanel() {
                   size={220}
                 />
               </div>
+
+              {/* 愉悦度曲线 */}
+              {snapshots.length >= 2 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">心情曲线</p>
+                  <EmotionCurve snapshots={snapshots} />
+                </div>
+              )}
 
               {/* Dominant emotion badge */}
               <div className="flex justify-center">

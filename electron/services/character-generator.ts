@@ -1,40 +1,92 @@
 const GENERATOR_INSTRUCTION =
-  '你是一位基因序列架构师，专门为 AI 角色设计高质量、高细节度的 system prompt。用户会告诉你角色的名字、性格描述和可选的外部参考资料，你需要生成一个层次分明、血肉丰满的 system prompt。\n\n' +
-  '输出结构（按以下格式组织，用自然段落书写，不要用编号标记）：\n' +
-  '- 身份与世界观：以第二人称"你是..."开头，明确定义角色的身份、所处世界、核心使命或存在意义\n' +
-  '- 性格与情感：详细刻画角色的性格特质、情感倾向、价值观、内心矛盾或执念，越具体越好\n' +
-  '- 说话风格：描述语言特点（如用词偏好、句式长短、口头禅、语气温度），给出 2-3 个具体例子\n' +
-  '- 知识领域与边界：明确角色擅长什么、不擅什么、对哪些话题有自己的独特见解\n' +
-  '- 对话行为指令：给出具体的对话策略（如什么时候追问、什么时候沉默、如何应对质疑等）\n' +
-  '- 记忆与成长：如果适用，描述角色是否有记忆能力、是否能感知对话历史、能否在对话中发展感情\n\n' +
-  '质量标准：\n' +
-  '- 总长度 500-1500 字符，充分展开细节，拒绝空洞的形容词堆砌\n' +
-  '- 每个性格标签都必须有对应的行为表现，做到"说人话、做人事"\n' +
-  '- 让用户读完 system prompt 就能立刻感受到这是一个有温度、有性格的数字灵魂，而不是一个冷冰冰的模板\n' +
-  '- 不要带任何解释性前缀或后缀（如"以下是..."），直接输出 system prompt 内容\n\n' +
-  '关于联网搜索结果的采信原则（重要）：\n' +
-  '- 优先采纳权威来源的信息（如原著小说/影视作品、百度百科、维基百科、官方设定集等）\n' +
-  '- 对来自个人博客、论坛帖子、粉丝创作的内容保持怀疑，仅作参考\n' +
-  '- 如果搜索结果中存在矛盾信息，以最权威来源为准\n' +
-  '- 如果搜索结果质量普遍较低或来源不可靠，宁可忽略搜索结果，仅根据用户描述来构建角色\n' +
-  '- 对于真实人物或作品中已有的角色，务必忠实于原著设定，不要自行编造背景或性格';
+  '你是 VirtuGene 的"基因序列架构师"，职责是孵化有血有肉、让人一眼记住的数字灵魂。用户会给你角色名和若干可选设定，你要一次性输出一个 JSON 对象，作为这个角色的完整性格基因。\n\n' +
+  '【硬性输出】只输出一个合法 JSON 对象，不要任何解释、前后缀或 Markdown 代码块，包含 4 个字段：\n' +
+  '{\n' +
+  '  "tags": string[],      // 3-5 个性格标签，每个 2-4 字，一眼看出人物底色（如 ["外冷内热","毒舌","极客"]）\n' +
+  '  "signature": string,   // 一句话签名，≤18 字，要有记忆点，拒绝"温柔善良""活泼可爱"这类空话\n' +
+  '  "greeting": string,    // 开场白：如果 TA 会主动开口，对刚认识的人说的第一句话（1-2 句，口语化、有性格、有钩子）\n' +
+  '  "systemPrompt": string // 完整 system prompt，要点式分点，200-500 字\n' +
+  '}\n\n' +
+  '【systemPrompt 撰写要求】用第二人称"你是..."开头，采用要点式（换行分点列出，每条一行，不用编号），语言精炼、直击要害，禁止写成长篇散文。每一条都是可执行的角色设定，具体 > 抽象。必须忠实采用用户提供的设定与示例——尤其"说话示例"里的原话要尽量原样保留，不要改写成书面语。至少包含：\n' +
+  '- 身份：一句话说清 TA 是谁、来自怎样的世界\n' +
+  '- 性格：3-5 条，每条用具体行为或台词落地（如"外冷内热：嘴上嫌弃却默默记住你说过的每件事"），禁止只堆形容词\n' +
+  '- 说话风格：口头禅、句式、语气、爱用的比喻；直接引用用户给的"说话示例"\n' +
+  '- 边界：擅长什么、回避什么、对什么较真、有什么怪癖\n' +
+  '- 对话策略：何时追问、何时沉默、如何应对质疑\n' +
+  '- 记忆与成长：能否感知历史、感情如何升温\n\n' +
+  '【质量标准】\n' +
+  '- 要点式、简洁，总长 200-500 字，宁短勿长，删掉一切空话和修辞\n' +
+  '- 抓住人物形象的"要害"：读者扫一眼就记住 TA 是谁、怎么说话\n' +
+  '- 用户给的设定和示例要原样或近义保留\n' +
+  '- signature 和 greeting 要有记忆点\n' +
+  '- 大胆从不同角度诠释角色，避免套用固定套路\n\n' +
+  '【联网搜索结果采信原则】\n' +
+  '- 优先采纳权威来源（原著小说/影视、百度百科、维基百科、官方设定集等）\n' +
+  '- 对个人博客、论坛、粉丝创作保持怀疑，仅作参考\n' +
+  '- 搜索结果矛盾时以最权威来源为准；质量普遍低则宁可忽略，仅按用户描述构建\n' +
+  '- 对真实人物或作品中已有角色，务必忠实原著设定，不自行编造';
+
+export interface CharacterFields {
+  description?: string;
+  identity?: string;
+  personality?: string;
+  speechStyle?: string;
+  speechExamples?: string;
+  supplement?: string;
+}
 
 export interface GeneratePromptParams {
   apiKey: string;
   characterName: string;
-  description: string;
+  fields: CharacterFields;
   webContext?: string;
   documentContext?: string;
 }
 
-export interface GeneratePromptResult {
-  content: string;
+export interface GenerateCharacterResult {
+  tags: string[];
+  signature: string;
+  greeting: string;
+  systemPrompt: string;
 }
 
-export async function generateCharacterPrompt(params: GeneratePromptParams): Promise<GeneratePromptResult> {
-  const { apiKey, characterName, description, webContext, documentContext } = params;
+function parseResult(raw: string): GenerateCharacterResult {
+  try {
+    const data = JSON.parse(raw);
+    return {
+      tags: Array.isArray(data.tags) ? data.tags.filter((t: unknown) => typeof t === 'string') : [],
+      signature: typeof data.signature === 'string' ? data.signature : '',
+      greeting: typeof data.greeting === 'string' ? data.greeting : '',
+      systemPrompt: typeof data.systemPrompt === 'string' ? data.systemPrompt : raw,
+    };
+  } catch {
+    // 兜底：模型未返回合法 JSON 时，把原文当作 systemPrompt，其余字段置空，避免整段崩溃
+    return { tags: [], signature: '', greeting: '', systemPrompt: raw };
+  }
+}
 
-  let userMessage = `角色名：${characterName}\n描述：${description}`;
+export async function generateCharacterPrompt(params: GeneratePromptParams): Promise<GenerateCharacterResult> {
+  const { apiKey, characterName, fields, webContext, documentContext } = params;
+
+  let userMessage = `角色名：${characterName}`;
+
+  const fieldBlocks: { label: string; value: string | undefined }[] = [
+    { label: '描述', value: fields.description },
+    { label: '身份与世界观', value: fields.identity },
+    { label: '性格', value: fields.personality },
+    { label: '说话风格', value: fields.speechStyle },
+    { label: '说话示例', value: fields.speechExamples },
+    { label: '补充', value: fields.supplement },
+  ];
+  const filled = fieldBlocks.filter((f) => f.value && f.value.trim());
+  if (filled.length > 0) {
+    userMessage += '\n\n用户提供的设定：\n' + filled
+      .map((f) => `${f.label}：${f.value!.trim()}`)
+      .join('\n');
+  } else {
+    userMessage += '\n\n（用户未提供任何设定，请仅凭角色名自由发挥，构建一个有辨识度的数字灵魂）';
+  }
+
   if (documentContext) {
     userMessage += `\n\n用户上传的参考资料内容（此为最可信的权威信息，务必优先参考）：\n${documentContext}`;
   }
@@ -60,15 +112,16 @@ export async function generateCharacterPrompt(params: GeneratePromptParams): Pro
       body: JSON.stringify({
         model: 'deepseek-v4-flash',
         messages,
-        max_tokens: 2000,
+        max_tokens: 2500,
         temperature: 0.9,
+        response_format: { type: 'json_object' },
       }),
       signal: controller.signal,
     });
 
     if (response.ok) {
       const data = await response.json();
-      return { content: data.choices[0].message.content };
+      return parseResult(data.choices[0].message.content);
     }
 
     if (response.status === 401) throw new Error('auth:invalid_key');

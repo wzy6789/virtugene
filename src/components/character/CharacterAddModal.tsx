@@ -21,7 +21,7 @@ export function CharacterAddModal({ open, onClose, editCharacter }: CharacterAdd
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="基因实验室" width="max-w-2xl">
+    <Modal open={open} onClose={handleClose} title="基因实验室" width="max-w-2xl" closeOnBackdrop={false}>
       <div className="flex border-b border-line">
         <button
           className={`flex-1 py-3 text-sm font-medium transition-colors ${

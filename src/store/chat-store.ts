@@ -8,7 +8,7 @@ import { emotionRepo } from '../db/emotion-repo';
 import { stateRepo } from '../db/state-repo';
 import { useAuthStore } from './auth-store';
 import { useCharacterStateStore } from './character-state-store';
-import { deriveProactivity } from '../lib/personality';
+import { deriveProactivity, GREETING_PROACTIVITY_THRESHOLD } from '../lib/personality';
 import { ipc } from '../lib/ipc-client';
 
 interface CharPreview {
@@ -30,10 +30,12 @@ interface ChatState {
   addProactiveMessage: (characterId: string, content: string) => Promise<void>;
   refreshPreviews: () => Promise<void>;
   fetchUnreadCounts: () => Promise<void>;
-  createCharacter: (data: Omit<Character, 'id' | 'createdAt' | 'proactivity'>) => Promise<Character>;
+  createCharacter: (data: Omit<Character, 'id' | 'createdAt' | 'proactivity'> & { proactivity?: number }) => Promise<Character>;
   updateCharacter: (id: string, updates: Partial<Character>) => Promise<void>;
   deleteCharacterWithSessions: (id: string) => Promise<void>;
   deleteCharacter: (id: string) => Promise<void>;
+  deleteMessage: (id: string) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   triggerProactive: () => Promise<void>;
   reset: () => void;
@@ -70,6 +72,23 @@ function proactivityOf(c: Character): number {
   return c.proactivity ?? deriveProactivity(c.tags, c.systemPrompt);
 }
 
+/** 新会话时，按角色主动倾向决定是否先发开场白 */
+async function seedGreeting(characterId: string, sessionId: string): Promise<void> {
+  const char = await characterRepo.getById(characterId);
+  if (!char?.greeting) return;
+  if (proactivityOf(char) < GREETING_PROACTIVITY_THRESHOLD) return;
+
+  const msg: Message = {
+    id: crypto.randomUUID(),
+    sessionId,
+    role: 'assistant',
+    content: char.greeting,
+    createdAt: Date.now(),
+    isProactive: false,
+  };
+  await messageRepo.create(msg);
+}
+
 /** 按 proactivity² 加权随机选择角色，主动倾向越强越容易被选中 */
 function weightedPick(chars: Character[]): Character {
   const weights = chars.map((c) => {
@@ -96,11 +115,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadCharacters: async () => {
     const userId = useAuthStore.getState().userId ?? '';
     const all = await characterRepo.getAll();
-    // Sidebar shows only presets + own custom characters. Others' published
-    // characters are discoverable/clonable in the gene pool, not pushed here.
-    const visible = all.filter(
-      (c) => c.isPreset || c.createdBy === userId,
-    );
+    // Sidebar shows only the user's own characters. Presets and others' published
+    // genes live in the gene pool and are cloned in when the user adds them.
+    const visible = all.filter((c) => c.createdBy === userId);
     const previews: Record<string, CharPreview | null> = {};
     const unreadCounts: Record<string, number> = {};
     for (const c of visible) {
@@ -108,14 +125,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       unreadCounts[c.id] = await sessionRepo.getUnreadByCharacter(c.id, userId);
     }
     set({ characters: visible, charPreviews: previews, unreadByCharacter: unreadCounts });
-    if (visible.length > 0 && !get().selectedCharacterId) {
-      get().selectCharacter(visible[0].id);
+    const { selectedCharacterId } = get();
+    const stillSelected = visible.some((c) => c.id === selectedCharacterId);
+    if (stillSelected) return;
+    if (visible.length > 0) {
+      await get().selectCharacter(visible[0].id);
+    } else {
+      set({ selectedCharacterId: null, currentSessionId: null, messages: [] });
     }
   },
 
   selectCharacter: async (id) => {
     const userId = useAuthStore.getState().userId ?? '';
+    const existing = await sessionRepo.getByCharacter(id, userId);
     const session = await getOrCreateSession(id, userId);
+    if (existing.length === 0) {
+      await seedGreeting(id, session.id);
+    }
     const msgs = await messageRepo.getBySession(session.id);
     // Clear unread for this character (user's own sessions only)
     const sessions = await sessionRepo.getByCharacter(id, userId);
@@ -128,13 +154,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   addMessage: (msg) => {
-    // 用户主动发言会拉近关系、提振角色心情
-    if (msg.role === 'user') {
-      const { selectedCharacterId } = get();
-      if (selectedCharacterId) {
-        void useCharacterStateStore.getState().bump(selectedCharacterId, 1, 2);
-      }
-    }
     set((s) => ({
       messages: [...s.messages, msg],
       charPreviews: {
@@ -216,6 +235,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const session = await getOrCreateSession(targetChar.id, userId);
       const msgs = await messageRepo.getBySession(session.id);
 
+      // 连续未被回应的主动消息条数
+      let unansweredProactive = 0;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].isProactive) unansweredProactive += 1;
+        else break;
+      }
+      // 用户一直没回复时，主动消息最多发 3 条，不再继续刷
+      if (unansweredProactive >= 3) {
+        console.log(`[proactive] ${targetChar.name} 已有 ${unansweredProactive} 条未回应主动消息，跳过`);
+        return;
+      }
+
       // 上一条主动消息未被回应 → 好感度/心情下滑
       const last = msgs[msgs.length - 1];
       if (last && last.isProactive) {
@@ -268,7 +299,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       id: crypto.randomUUID(),
       published: (data as any).published ?? false,
       createdBy: userId,
-      proactivity: deriveProactivity(data.tags ?? [], data.systemPrompt ?? ''),
+      proactivity: data.proactivity ?? deriveProactivity(data.tags ?? [], data.systemPrompt ?? ''),
       createdAt: now,
     };
     await characterRepo.create(character);
@@ -299,6 +330,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await get().deleteCharacterWithSessions(id);
   },
 
+  deleteMessage: async (id) => {
+    await messageRepo.deleteById(id);
+    set((s) => ({ messages: s.messages.filter((m) => m.id !== id) }));
+    await get().refreshPreviews();
+  },
+
+  togglePin: async (id) => {
+    const userId = useAuthStore.getState().userId ?? '';
+    const char = await characterRepo.getById(id);
+    if (!char || char.isPreset || char.createdBy !== userId) return;
+    await characterRepo.update(id, { pinned: !char.pinned });
+    await get().loadCharacters();
+  },
+
   deleteCharacterWithSessions: async (id) => {
     const userId = useAuthStore.getState().userId ?? '';
     const sessions = await sessionRepo.getByCharacter(id, userId);
@@ -312,9 +357,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const { selectedCharacterId } = get();
     const all = await characterRepo.getAll();
-    const visible = all.filter(
-      (c) => c.isPreset || c.createdBy === userId,
-    );
+    const visible = all.filter((c) => c.createdBy === userId);
     const previews: Record<string, CharPreview | null> = {};
     for (const c of visible) {
       previews[c.id] = await getLastMessage(c.id, userId);

@@ -17,6 +17,23 @@ const ERROR_MAP: Record<string, string> = {
   'server:error': '基因链接中断，请重试',
 };
 
+interface Candidate {
+  tags: string[];
+  signature: string;
+  greeting: string;
+  systemPrompt: string;
+}
+
+const STEP_FIELDS = [
+  { key: 'identity', title: '身份与世界观', placeholder: 'TA 是谁？来自怎样的世界？（如：一位穿梭星际的旅人）' },
+  { key: 'personality', title: '性格', placeholder: 'TA 的性格特质、情感倾向（如：开朗、好奇、偶尔毒舌）' },
+  { key: 'speechStyle', title: '说话风格', placeholder: 'TA 怎么说话？口头禅、语气、句式（如：喜欢用星空比喻情感）' },
+  { key: 'speechExamples', title: '说话示例', placeholder: '给 1-2 句 TA 会说的话作为参考' },
+  { key: 'supplement', title: '补充', placeholder: '其他任何想让 TA 记住的设定' },
+] as const;
+
+type FieldKey = (typeof STEP_FIELDS)[number]['key'];
+
 export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
   const isEdit = !!editCharacter;
   const apiKey = useAuthStore((s) => s.apiKey);
@@ -25,11 +42,31 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
 
   const [name, setName] = useState(editCharacter?.name ?? '');
   const [avatar, setAvatar] = useState(editCharacter?.avatar ?? '🧬');
-  const [description, setDescription] = useState('');
   const [systemPrompt, setSystemPrompt] = useState(editCharacter?.systemPrompt ?? '');
+  const [tags, setTags] = useState<string[]>(editCharacter?.tags ?? []);
+  const [signature, setSignature] = useState(editCharacter?.signature ?? '');
+  const [greeting, setGreeting] = useState(editCharacter?.greeting ?? '');
+  const [tagInput, setTagInput] = useState('');
   const [enableWebSearch, setEnableWebSearch] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [published, setPublished] = useState(editCharacter?.published ?? false);
+
+  const [fields, setFields] = useState<Record<FieldKey, string>>({
+    identity: '',
+    personality: '',
+    speechStyle: '',
+    speechExamples: '',
+    supplement: '',
+  });
+  const [mode, setMode] = useState<'simple' | 'guided'>('guided');
+  const [description, setDescription] = useState('');
+  const [openSections, setOpenSections] = useState<Record<FieldKey, boolean>>({
+    identity: true,
+    personality: false,
+    speechStyle: false,
+    speechExamples: false,
+    supplement: false,
+  });
 
   // File import state
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,12 +84,19 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [generationProgress, setGenerationProgress] = useState<{ step: string; message: string } | null>(null);
+  const [generationProgress, setGenerationProgress] = useState<{ step: string; message: string; progress: number } | null>(null);
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const canGenerate = name.trim().length >= 2 && description.trim().length > 0 && !isEdit;
+  const filledCount = STEP_FIELDS.filter((f) => fields[f.key].trim().length > 0).length;
+  const canGenerate = name.trim().length >= 2 && !isEdit && (
+    mode === 'simple' ? description.trim().length > 0 : filledCount > 0
+  );
   const canSave = name.trim().length >= 2 && systemPrompt.trim().length > 0;
+
+  const setField = (key: FieldKey, value: string) => setFields((f) => ({ ...f, [key]: value }));
+  const toggleSection = (key: FieldKey) => setOpenSections((o) => ({ ...o, [key]: !o[key] }));
 
   const processFile = async (file: File) => {
     pendingFileRef.current = file;
@@ -133,7 +177,6 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set false if leaving the drop zone itself (not a child element)
     if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragOver(false);
     }
@@ -161,16 +204,19 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
     setIsGenerating(true);
     setGenerationError(null);
     setGenerationProgress(null);
+    setCandidates(null);
 
+    const genFields = mode === 'simple' ? { description: description.trim() } : fields;
     const result = await ipc.character.generate(
       {
         apiKey: apiKey ?? '',
         characterName: name.trim(),
-        description: description.trim(),
+        fields: genFields,
         enableWebSearch,
         documentContext: documentText ?? undefined,
+        count: 3,
       },
-      (step, message) => setGenerationProgress({ step, message }),
+      (step, message, progress) => setGenerationProgress({ step, message, progress }),
     );
 
     setIsGenerating(false);
@@ -178,10 +224,27 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
 
     if (result.error) {
       setGenerationError(ERROR_MAP[result.error] ?? ERROR_MAP['server:error']);
-    } else if (result.content) {
-      setSystemPrompt(result.content.trim());
+    } else if (result.candidates && result.candidates.length > 0) {
+      setCandidates(result.candidates);
     }
   };
+
+  const handlePickCandidate = (c: Candidate) => {
+    setTags(c.tags);
+    setSignature(c.signature);
+    setGreeting(c.greeting);
+    setSystemPrompt(c.systemPrompt);
+    setCandidates(null);
+  };
+
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (!t) return;
+    setTagInput('');
+    if (!tags.includes(t)) setTags([...tags, t]);
+  };
+
+  const removeTag = (t: string) => setTags(tags.filter((x) => x !== t));
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -199,6 +262,9 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
         name: name.trim(),
         avatar,
         systemPrompt: systemPrompt.trim(),
+        tags,
+        signature: signature.trim(),
+        greeting: greeting.trim(),
         published,
       });
     } else {
@@ -206,11 +272,14 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
         name: name.trim(),
         avatar,
         systemPrompt: systemPrompt.trim(),
-        tags: [],
+        tags,
+        signature: signature.trim(),
+        greeting: greeting.trim(),
         isPreset: false,
         isCustom: true,
-        published: published as any,
-      } as any);
+        published,
+        createdBy: '',
+      });
     }
 
     setIsSaving(false);
@@ -248,7 +317,6 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
           className="hidden"
         />
         <div className="flex items-center gap-3">
-          {/* Avatar preview */}
           <div className="relative">
             <button
               type="button"
@@ -281,7 +349,6 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
             )}
           </div>
 
-          {/* Image upload button */}
           <button
             type="button"
             onClick={() => imageInputRef.current?.click()}
@@ -292,17 +359,74 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
         </div>
       </div>
 
-      {/* Description */}
+      {/* Create-mode input: toggle between simple description & 5-step guide */}
       {!isEdit && (
-        <div>
-          <label className="block text-sm text-gray-400 mb-1.5">描述</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="描述这个数字灵魂的性格、说话风格、背景故事..."
-            rows={3}
-            className="w-full px-4 py-3 bg-surface border border-line-strong rounded-xl text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors resize-none"
-          />
+        <div className="space-y-3">
+          <div className="flex gap-1 p-1 rounded-xl bg-surface border border-line">
+            <button
+              type="button"
+              onClick={() => setMode('simple')}
+              className={`flex-1 py-1.5 rounded-lg text-xs transition-colors ${
+                mode === 'simple' ? 'bg-gene-purple text-white' : 'text-gray-500 hover:text-sub'
+              }`}
+            >
+              快速描述
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('guided')}
+              className={`flex-1 py-1.5 rounded-lg text-xs transition-colors ${
+                mode === 'guided' ? 'bg-gene-purple text-white' : 'text-gray-500 hover:text-sub'
+              }`}
+            >
+              精细刻画
+            </button>
+          </div>
+
+          {mode === 'simple' ? (
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="描述这个数字灵魂的性格、说话风格、背景故事..."
+              rows={3}
+              className="w-full px-4 py-3 bg-surface border border-line-strong rounded-xl text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors resize-none"
+            />
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">
+                至少填写一项即可生成，填写越完整基因序列越精准
+              </p>
+              {STEP_FIELDS.map((f, i) => (
+                <div key={f.key} className="rounded-xl border border-line bg-surface overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(f.key)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  >
+                    <span className="text-sm text-ink">
+                      <span className="text-gene-purple mr-1.5">{i + 1}</span>
+                      {f.title}
+                    </span>
+                    <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                      {fields[f.key].trim() ? '已填' : '可选'}
+                      <span className="text-gray-500">{openSections[f.key] ? '▴' : '▾'}</span>
+                    </span>
+                  </button>
+                  {openSections[f.key] && (
+                    <div className="px-4 pb-3">
+                      <textarea
+                        value={fields[f.key]}
+                        onChange={(e) => setField(f.key, e.target.value)}
+                        placeholder={f.placeholder}
+                        rows={2}
+                        className="w-full px-3 py-2 bg-surface border border-line-strong rounded-lg text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors resize-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -412,18 +536,21 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
       {/* Generate button — create mode only */}
       {!isEdit && (
         <div>
-          {/* Progress indicator */}
-          {isGenerating && generationProgress && (
-            <div className="mb-3 px-4 py-3 rounded-xl bg-gene-purple/5 border border-gene-purple/10 space-y-2">
+          {isGenerating && (
+            <div className="mb-3 px-4 py-3 rounded-xl bg-gene-purple/5 border border-gene-purple/10 space-y-2.5">
               <div className="flex items-center gap-3">
                 <svg className="animate-spin w-4 h-4 text-gene-purple shrink-0" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="20" />
                 </svg>
-                <span className="text-sm text-gene-purple">{generationProgress.message}</span>
+                <span className="text-sm text-gene-purple">
+                  {generationProgress ? generationProgress.message : '正在连接基因库...'}
+                </span>
               </div>
-              <div className="flex gap-1.5">
-                <div className={`h-1 rounded-full flex-1 transition-colors ${generationProgress.step === 'search' ? 'bg-gene-purple animate-pulse' : 'bg-gene-purple/30'}`} />
-                <div className={`h-1 rounded-full flex-1 transition-colors ${generationProgress.step === 'generate' ? 'bg-gene-purple animate-pulse' : 'bg-surface'}`} />
+              <div className="h-1.5 rounded-full bg-gene-purple/15 overflow-hidden">
+                <div
+                  className="h-full bg-gene-purple transition-all duration-500 ease-out"
+                  style={{ width: `${Math.round((generationProgress?.progress ?? 0.03) * 100)}%` }}
+                />
               </div>
             </div>
           )}
@@ -440,7 +567,7 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
                 {generationProgress ? generationProgress.message : '基因测序中...'}
               </>
             ) : (
-              '⚡ 全节点扫描并生成基因序列'
+              systemPrompt ? '🔄 重新测序' : '⚡ 全节点扫描并生成基因序列'
             )}
           </button>
           {generationError && (
@@ -449,30 +576,113 @@ export function CreateGeneTab({ editCharacter, onClose }: CreateGeneTabProps) {
         </div>
       )}
 
-      {/* System prompt */}
-      <div>
-        <label className="block text-sm text-gray-400 mb-1.5">
-          {isEdit ? '基因序列' : '生成的基因序列'}
-        </label>
-        <textarea
-          value={systemPrompt}
-          onChange={(e) => setSystemPrompt(e.target.value)}
-          placeholder={isEdit ? '' : '点击上方按钮生成基因序列，或手动输入...'}
-          rows={4}
-          className="w-full px-4 py-3 bg-surface border border-line-strong rounded-xl text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors resize-none"
-        />
-        {!isEdit && systemPrompt && (
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="mt-2 text-xs text-life-cyan hover:underline"
-          >
-            重新测序
-          </button>
-        )}
-      </div>
+      {/* Candidate comparison — create mode only, before picking */}
+      {!isEdit && candidates && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400">选择一组最契合的基因序列：</p>
+          <div className="grid grid-cols-3 gap-2">
+            {candidates.map((c, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handlePickCandidate(c)}
+                className="text-left p-3 rounded-xl border border-line hover:border-gene-purple hover:bg-gene-purple/5 transition-colors"
+              >
+                <div className="text-[10px] text-life-cyan mb-1">候选 {i + 1}</div>
+                <div className="flex flex-wrap gap-1">
+                  {c.tags.map((t) => (
+                    <span key={t} className="text-[9px] px-1 py-0.5 rounded bg-gene-purple/10 text-gene-purple">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[10px] text-gray-600 line-clamp-5 whitespace-pre-line">{c.systemPrompt}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Publish to gene pool — create mode only; edit mode shows toggle for published chars */}
+      {/* Generated result — editable fields */}
+      {((!isEdit && (systemPrompt || candidates)) || isEdit) && (
+        <div className="space-y-4">
+          {/* Tags */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">性格标签</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {tags.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gene-purple/10 text-gene-purple text-xs"
+                >
+                  {t}
+                  <button type="button" onClick={() => removeTag(t)} className="text-gene-purple/70 hover:text-gene-purple">×</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                placeholder="添加标签，回车确认"
+                className="flex-1 px-3 py-2 bg-surface border border-line-strong rounded-lg text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={addTag}
+                className="px-3 py-2 rounded-lg bg-surface border border-line-strong text-xs text-sub hover:bg-surface-strong transition-colors"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+
+          {/* Signature & greeting — edit mode only */}
+          {isEdit && (
+            <>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">一句话签名</label>
+                <input
+                  type="text"
+                  value={signature}
+                  onChange={(e) => setSignature(e.target.value)}
+                  placeholder="凝练这个灵魂的一句话"
+                  className="w-full px-4 py-3 bg-surface border border-line-strong rounded-xl text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">示例开场白</label>
+                <input
+                  type="text"
+                  value={greeting}
+                  onChange={(e) => setGreeting(e.target.value)}
+                  placeholder="TA 主动开口说的第一句话"
+                  className="w-full px-4 py-3 bg-surface border border-line-strong rounded-xl text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors"
+                />
+              </div>
+            </>
+          )}
+
+          {/* System prompt */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">
+              {isEdit ? '基因序列' : '生成的基因序列'}
+            </label>
+            <textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder={isEdit ? '' : '点击上方按钮生成基因序列，或手动输入...'}
+              rows={4}
+              className="w-full px-4 py-3 bg-surface border border-line-strong rounded-xl text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple/50 transition-colors resize-none"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Publish to gene pool */}
       {!isEdit && (
         <label className="flex items-center gap-2 cursor-pointer">
           <input

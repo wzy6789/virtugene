@@ -9,3 +9,9 @@ Thumbs.db
 
 # Claude Code local overrides
 .claude/settings.local.json
+
+# Dev / backup assets
+resources/icon-original.png
+resources/icon-preview.png
+resources/resources/
+scripts/make-icon.py

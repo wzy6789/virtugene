@@ -7,6 +7,7 @@ import { ChatPage } from './pages/ChatPage';
 import { MainLayout } from './components/layout/MainLayout';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { UpdateNotesModal } from './components/update/UpdateNotesModal';
+import { OnboardingGuide } from './components/onboarding/OnboardingGuide';
 import { getChangelog, LAST_SEEN_VERSION_KEY } from './lib/changelog';
 import { initSeedCharacters } from './lib/seed-init';
 
@@ -76,6 +77,7 @@ export default function App() {
         version={updateNotes?.version ?? ''}
         notes={updateNotes?.notes ?? []}
       />
+      {isLoggedIn && <OnboardingGuide />}
     </div>
   );
 }

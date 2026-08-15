@@ -15,4 +15,8 @@ export const messageRepo = {
   async deleteBySession(sessionId: string): Promise<void> {
     await db.messages.where('sessionId').equals(sessionId).delete();
   },
+
+  async deleteById(id: string): Promise<void> {
+    await db.messages.delete(id);
+  },
 };

@@ -28,12 +28,28 @@ interface VirtuGeneAPI {
       params: {
         apiKey: string;
         characterName: string;
-        description: string;
+        fields: {
+          description?: string;
+          identity?: string;
+          personality?: string;
+          speechStyle?: string;
+          speechExamples?: string;
+          supplement?: string;
+        };
         enableWebSearch: boolean;
         documentContext?: string;
+        count?: number;
       },
-      onProgress?: (step: string, message: string) => void,
-    ) => Promise<{ content?: string; error?: string }>;
+      onProgress?: (step: string, message: string, progress: number) => void,
+    ) => Promise<{
+      candidates?: {
+        tags: string[];
+        signature: string;
+        greeting: string;
+        systemPrompt: string;
+      }[];
+      error?: string;
+    }>;
   };
   file: {
     parse: (file: File) => Promise<{ text?: string; error?: string }>;

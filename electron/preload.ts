@@ -11,14 +11,22 @@ contextBridge.exposeInMainWorld('virtugene', {
     generate: (params: {
       apiKey: string;
       characterName: string;
-      description: string;
+      fields: {
+        description?: string;
+        identity?: string;
+        personality?: string;
+        speechStyle?: string;
+        speechExamples?: string;
+        supplement?: string;
+      };
       enableWebSearch: boolean;
       documentContext?: string;
-    }, onProgress?: (step: string, message: string) => void) => {
+      count?: number;
+    }, onProgress?: (step: string, message: string, progress: number) => void) => {
       let cleanup: (() => void) | null = null;
       if (onProgress) {
-        const handler = (_event: Electron.IpcRendererEvent, data: { step: string; message: string }) => {
-          onProgress(data.step, data.message);
+        const handler = (_event: Electron.IpcRendererEvent, data: { step: string; message: string; progress: number }) => {
+          onProgress(data.step, data.message, data.progress);
         };
         ipcRenderer.on('character:generate:progress', handler);
         cleanup = () => ipcRenderer.removeListener('character:generate:progress', handler);
