@@ -37,5 +37,5 @@ mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-  artifactName: ${productName}-${version}-mac.${ext}
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
   category: public.app-category.productivity
