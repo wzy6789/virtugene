@@ -69,8 +69,8 @@ export function OnboardingGuide() {
           bottom={168}
           arrow="left"
           step="1 / 2"
-          title="培育新灵魂"
-          desc="点这里的「培育新灵魂」，从「基因库」挑选现成角色，或「创造基因」培育属于你的独特灵魂。"
+          title="基因实验室"
+          desc="点这里的「基因实验室」，从「基因库」挑选现成角色，或「创造基因」培育属于你的独特灵魂。"
           onClose={() => setTipStep(2)}
         />
       )}

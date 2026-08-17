@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './http';
+
 const MEMORY_EXTRACTION_PROMPT =
   '你是一个记忆提取系统。从以下对话中提取关于用户的**关键事实**和**重要信息**。\n\n' +
   '规则：\n' +
@@ -28,19 +30,23 @@ export async function extractMemories(params: ConsolidateParams): Promise<Consol
   ];
 
   try {
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+    const response = await fetchWithTimeout(
+      'https://api.deepseek.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'deepseek-v4-flash',
+          messages,
+          max_tokens: 1000,
+          temperature: 0.3,
+        }),
       },
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages,
-        max_tokens: 1000,
-        temperature: 0.3,
-      }),
-    });
+      30_000,
+    );
 
     if (!response.ok) {
       if (response.status === 401) return { error: 'auth:invalid_key' };
@@ -52,8 +58,6 @@ export async function extractMemories(params: ConsolidateParams): Promise<Consol
     const data = await response.json();
     const choice = data.choices?.[0];
     const text: string = choice?.message?.content ?? '';
-    console.log('[memory-consolidator] finish_reason:', choice?.finish_reason, '| completion_tokens:', data.usage?.completion_tokens);
-    console.log('[memory-consolidator] raw response:', JSON.stringify(text));
 
     // Parse JSON from response
     try {
@@ -71,7 +75,7 @@ export async function extractMemories(params: ConsolidateParams): Promise<Consol
           return { memories };
         } catch {}
       }
-      console.warn('[memory-consolidator] JSON parse failed, text:', text.slice(0, 300));
+      console.warn('[memory-consolidator] JSON parse failed');
       return { memories: [] };
     }
   } catch {

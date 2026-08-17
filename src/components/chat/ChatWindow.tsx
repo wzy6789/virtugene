@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useChatStore } from '../../store/chat-store';
 import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
@@ -11,11 +11,21 @@ import { BalanceBanner, type ChatError } from './BalanceBanner';
 import { messageRepo } from '../../db/message-repo';
 import { sessionRepo } from '../../db/session-repo';
 import { memoryRepo } from '../../db/memory-repo';
+import { emotionRepo } from '../../db/emotion-repo';
 import { stateRepo } from '../../db/state-repo';
 import { ipc } from '../../lib/ipc-client';
-import type { Message, MemoryItem } from '../../db/index';
+import { buildTimeContext, buildRelationshipContext, buildUserEmotionContext } from '../../lib/chat-context';
+import { checkReplyQuality } from '../../lib/reply-quality';
+import { useNotificationStore } from '../../store/notification-store';
+import type { Message } from '../../db/index';
 
 const FIVE_MINUTES = 5 * 60 * 1000;
+/** 会话保留窗口：最近 30 条消息原样保留，更早的滚动压缩为摘要 */
+const SUMMARY_WINDOW = 30;
+/** 摘要再生成阈值：滚动出窗口的消息累积到该数量才重新压缩 */
+const SUMMARY_REGENERATE_THRESHOLD = 10;
+/** 分条回复的逐条发出间隔（ms），模拟真人打字节奏 */
+const PART_DELAY_MS = 600;
 
 function formatTimeLabel(ts: number): string {
   const d = new Date(ts);
@@ -45,7 +55,10 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
   const selectedCharacterId = useChatStore((s) => s.selectedCharacterId);
   const characters = useChatStore((s) => s.characters);
   const addMessage = useChatStore((s) => s.addMessage);
+  const updateMessage = useChatStore((s) => s.updateMessage);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
+  const hasMoreMessages = useChatStore((s) => s.hasMoreMessages);
+  const loadEarlierMessages = useChatStore((s) => s.loadEarlierMessages);
   const apiKey = useAuthStore((s) => s.apiKey);
   const userId = useAuthStore((s) => s.userId) ?? '';
   const userAvatar = useAuthStore((s) => s.avatar) ?? DEFAULT_USER_AVATAR;
@@ -58,9 +71,12 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
 
   const character = characters.find((c) => c.id === selectedCharacterId);
 
-  // Clear the reply banner when switching conversations
+  // Clear the reply banner when switching conversations, and reset the sending
+  // state: 旧会话的"正在输入"与输入锁定不能带到新会话，否则切走后无法在新会话输入
   useEffect(() => {
     setReplyingTo(null);
+    setSending(false);
+    setError(null);
   }, [currentSessionId]);
 
   // Focus the input when switching characters so the user can type immediately
@@ -97,18 +113,52 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
     getItemKey: (index) => rows[index].key,
   });
 
-  // Keep pinned to the bottom on new messages / session switch
-  useEffect(() => {
-    if (rows.length === 0) return;
+  // Keep scrolled to the latest message on new messages / session switch /
+  // "对方正在输入"出现。以最后一条消息 id 为键：前插（加载更早消息）不会触发滚底。
+  const lastRowKey = rows.length > 0 ? rows[rows.length - 1].key : null;
+
+  const scrollToLatest = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const scrollToBottom = () => {
+    const toBottom = () => {
       el.scrollTop = el.scrollHeight;
     };
-    scrollToBottom();
-    const raf = requestAnimationFrame(scrollToBottom);
-    return () => cancelAnimationFrame(raf);
-  }, [rows.length]);
+    toBottom();
+    // 虚拟滚动对行高的测量是异步完成的：再补两帧 + 延时，
+    // 确保滚到的是"测量完成后的真实最新位置"，而不是估算高度
+    const raf1 = requestAnimationFrame(toBottom);
+    const raf2 = requestAnimationFrame(toBottom);
+    const timer = setTimeout(toBottom, 120);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!lastRowKey) return;
+    return scrollToLatest();
+  }, [lastRowKey, scrollToLatest]);
+
+  // 发送后「对方正在输入」出现在列表底部（虚拟列表之外的兄弟节点），
+  // 新消息 id 没变，必须单独在 sending 变为 true 时再滚一次到底
+  useEffect(() => {
+    if (!sending || !lastRowKey) return;
+    return scrollToLatest();
+  }, [sending, lastRowKey, scrollToLatest]);
+
+  /** 加载更早消息：记录滚动位置，插入后补偿高度差，保持当前视野不跳变 */
+  const handleLoadEarlier = async () => {
+    const el = scrollRef.current;
+    const prevScrollTop = el?.scrollTop ?? 0;
+    const prevScrollHeight = el?.scrollHeight ?? 0;
+    await loadEarlierMessages();
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.scrollTop = prevScrollTop + (el.scrollHeight - prevScrollHeight);
+    });
+  };
 
   const handleSend = async (text: string) => {
     const sessionId = currentSessionId;
@@ -136,37 +186,98 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
     await sessionRepo.touch(sessionId);
     setReplyingTo(null);
 
-    // Build history from last messages
+    await performSend(text, apiMessage, userMsg);
+  };
+
+  /** 微信式重发：点击失败消息的红色感叹号，重发原内容（复用同一消息记录） */
+  const handleRetry = async (failedMsg: Message) => {
+    if (!currentSessionId || !character || !apiKey || sending) return;
+    if (failedMsg.sessionId !== currentSessionId) return;
+    const apiMessage = failedMsg.replyToContent
+      ? `（你在引用这条消息：「${failedMsg.replyToContent}」）\n${failedMsg.content}`
+      : failedMsg.content;
+    await performSend(failedMsg.content, apiMessage, failedMsg);
+  };
+
+  /** 核心发送管线：构建上下文 → 调 API（带自检重试）→ 落库/上屏；失败则把用户消息标记为失败态 */
+  const performSend = async (text: string, apiMessage: string, userMsg: Message) => {
+    const sessionId = userMsg.sessionId;
+    if (!character || !apiKey) return;
+
+    // 重发场景：先清除失败标记
+    if (userMsg.failed) {
+      await messageRepo.markFailed(userMsg.id, false);
+      updateMessage(userMsg.id, { failed: false });
+    }
+
+    // Build history from last messages.
+    // 注意：allMsgs 已包含刚发送的 userMsg，history 需排除最后一条，
+    // 否则模型会看到同一条用户消息两遍（deepseek.ts 会再 append 一次）。
     const allMsgs = useChatStore.getState().messages;
-    const history = allMsgs.slice(-20).map((m) => ({
+    const history = allMsgs.slice(-21, -1).map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
 
-    // Inject character memories into system prompt
-    const memories = await memoryRepo.getByCharacter(character.id, userId);
+    // Inject character memories into system prompt (最近 15 条，避免上下文膨胀)
+    const memories = await memoryRepo.getRecentByCharacter(character.id, userId, 15);
     const memoryContext = memories.length > 0
       ? '\n\n[关于用户的长期记忆]\n' + memories.map((m) => `- ${m.content}`).join('\n')
       : '';
 
-    // Inject relationship state (affinity/mood) so it shapes the reply tone
+    // 时间感知：现在几点、距上次聊天多久（上一轮消息 = allMsgs 倒数第二条）
+    const prevMessage = allMsgs.length >= 2 ? allMsgs[allMsgs.length - 2] : undefined;
+    const timeContext = '\n\n' + buildTimeContext(prevMessage?.createdAt);
+
+    // 关系状态文字化：档位描述替代数字
     const state = await stateRepo.getOrCreate(character.id, userId);
-    const relationshipContext =
-      `\n\n[当前关系状态]\n用户与你的好感度：${Math.round(state.affinity)}/100，你此刻的心情：${Math.round(state.mood)}/100。` +
-      '让这两个数值自然影响你的语气：好感度越高越亲近温和，越低越疏离防备；心情越高越轻快，越低越低落或易烦。不要直接说出这些数字。';
+    const relationshipContext = buildRelationshipContext(state.affinity, state.mood);
 
-    const enrichedPrompt = character.systemPrompt + memoryContext + relationshipContext;
+    // 用户情绪感知：最近一次结算感知到的用户情绪
+    const latestSnapshot = await emotionRepo.getLatest(sessionId);
+    const userEmotionContext = buildUserEmotionContext(latestSnapshot?.userEmotion);
 
-    // Call DeepSeek
+    // 长会话滚动摘要：早期对话压缩，角色不用逐条回忆
+    const sessionData = await sessionRepo.getById(sessionId);
+    const summaryContext = sessionData?.summary
+      ? `\n\n[早前对话摘要（更早的内容已压缩，不必逐条回忆，若与当前话题相关可自然提及）]\n${sessionData.summary}`
+      : '';
+
+    const enrichedPrompt =
+      character.systemPrompt + memoryContext + timeContext + relationshipContext + userEmotionContext + summaryContext;
+
+    // 动态温度：按角色主动倾向微调——高冷/疏离用低温度（更克制稳定），活泼/话痨用高温度（更跳脱）
+    const temperature = 0.6 + (character.proactivity ?? 0.5) * 0.3;
+
+    // Call DeepSeek，带回复质量自检重试（静默重试，最多 2 次修正）
     const startedAt = Date.now();
     setSending(true);
+    const lastAssistantContent = [...allMsgs].reverse().find((m) => m.role === 'assistant')?.content;
+    // 发送期间用户可能已切走：错误横幅只显示在仍处于该会话时
+    const stillCurrent = () => useChatStore.getState().currentSessionId === sessionId;
     try {
-      const result = await ipc.chat.send({
-        apiKey,
-        systemPrompt: enrichedPrompt,
-        message: apiMessage,
-        history,
-      });
+      let result: { content?: string; error?: string; truncated?: boolean } = { error: 'server:error' };
+      let retryHint: string | undefined;
+      let retries = 0;
+      const MAX_RETRIES = 2;
+
+      for (;;) {
+        result = await ipc.chat.send({
+          apiKey,
+          systemPrompt: enrichedPrompt,
+          message: apiMessage,
+          history,
+          retryHint,
+          temperature,
+        });
+
+        if (result.error || !result.content) break;
+
+        const check = checkReplyQuality(result.content, text, lastAssistantContent);
+        if (check.ok || retries >= MAX_RETRIES) break;
+        retries += 1;
+        retryHint = check.retryHint;
+      }
 
       // 保证「对方正在输入…」至少展示约 0.7s，避免秒回一闪而过
       const elapsed = Date.now() - startedAt;
@@ -175,70 +286,86 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       }
 
       if (result.error) {
-        setError(result.error as ChatError);
-        // 402 doesn't block sending, other errors are transient
+        if (stillCurrent()) {
+          setError(result.error as ChatError);
+        }
+        // 微信式：发送失败 → 消息标记为失败态，显示红色感叹号可点击重发
+        await messageRepo.markFailed(userMsg.id, true);
+        updateMessage(userMsg.id, { failed: true });
       } else if (result.content) {
-        // Split multi-message responses on "---"
+        // Split multi-message responses on "---"，逐条延迟发出，模拟真人打字
         const parts = result.content.split('---').map((p: string) => p.trim()).filter((p: string) => p.length > 0);
         for (let i = 0; i < parts.length; i++) {
+          // 被 max_tokens 截断时，最后一条补「…」（真人发整条，但偶尔也像话没说完）
+          const isLast = i === parts.length - 1;
+          const content = isLast && result.truncated ? parts[i] + '…' : parts[i];
           const aiMsg: Message = {
             id: crypto.randomUUID(),
             sessionId,
             role: 'assistant',
-            content: parts[i],
+            content,
             createdAt: Date.now() + i, // ensure unique timestamps for ordering
             isProactive: false,
           };
           await messageRepo.create(aiMsg);
           addMessage(aiMsg);
+          if (!isLast) {
+            await new Promise((r) => setTimeout(r, PART_DELAY_MS));
+          }
         }
         await sessionRepo.touch(sessionId);
 
-        // Trigger memory consolidation every ~10 user messages
-        const userMsgCount = allMsgs.filter((m) => m.role === 'user').length + 1; // +1 for the just-sent message
-        if (userMsgCount > 0 && userMsgCount % 10 === 0) {
-          consolidateMemories(sessionId, character.id);
+        // 回复到达时用户已切到别的会话：不上屏，改弹应用内流体云提醒
+        if (!stillCurrent()) {
+          useNotificationStore.getState().push({
+            characterId: character.id,
+            characterName: character.name,
+            avatar: character.avatar,
+            preview: parts[0] ?? result.content,
+          });
         }
 
-        // Trigger relationship settlement every 3 user messages
-        const settledCount = allMsgs.filter((m) => m.role === 'user').length;
-        if (settledCount > 0 && settledCount % 3 === 0) {
+        // 每 5 条用户消息合并结算一次：情绪 + 记忆 + 好感度（单次 API 调用）。
+        // 注意：allMsgs 在 addMessage(userMsg) 之后读取，已包含刚发的这条，不能再 +1
+        const userMsgCount = allMsgs.filter((m) => m.role === 'user').length;
+        if (userMsgCount > 0 && userMsgCount % 5 === 0) {
           void useEmotionStore.getState().settle(character.id, sessionId, character.name);
         }
+
+        // 长会话滚动摘要（后台静默执行）
+        void maybeSummarize(sessionId);
       }
     } catch {
-      setError('server:error');
+      if (stillCurrent()) {
+        setError('server:error');
+      }
+      await messageRepo.markFailed(userMsg.id, true);
+      updateMessage(userMsg.id, { failed: true });
     } finally {
       setSending(false);
     }
   };
 
-  // Fire-and-forget memory consolidation
-  const consolidateMemories = async (sessionId: string, characterId: string) => {
+  /** 长会话滚动摘要：超出保留窗口的早期对话压缩成摘要，持久化到会话 */
+  const maybeSummarize = async (sessionId: string) => {
     if (!apiKey) return;
     try {
       const msgs = await messageRepo.getBySession(sessionId);
-      // Only consolidate if there are enough messages
-      if (msgs.length < 20) return;
-      const history = msgs.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-      const result = await ipc.memory.extract({ apiKey, history });
-      if (result.memories && result.memories.length > 0) {
-        const now = Date.now();
-        const items: MemoryItem[] = result.memories.map((content: string) => ({
-          id: crypto.randomUUID(),
-          characterId,
-          userId,
-          content,
-          type: 'auto' as const,
-          createdAt: now,
-        }));
-        await memoryRepo.createMany(items);
+      if (msgs.length <= SUMMARY_WINDOW) return;
+
+      const oldMsgs = msgs.slice(0, msgs.length - SUMMARY_WINDOW);
+      const sessionData = await sessionRepo.getById(sessionId);
+      const lastCovered = sessionData?.summaryUpdatedAt ?? 0;
+      const uncovered = oldMsgs.filter((m) => m.createdAt > lastCovered);
+      if (uncovered.length < SUMMARY_REGENERATE_THRESHOLD) return;
+
+      const history = oldMsgs.slice(-200).map((m) => ({ role: m.role, content: m.content }));
+      const result = await ipc.context.summarize({ apiKey, history });
+      if (result.summary) {
+        await sessionRepo.updateSummary(sessionId, result.summary);
       }
     } catch {
-      // Silently fail — memory consolidation is best-effort
+      // 摘要失败是 best-effort，静默忽略
     }
   };
 
@@ -254,6 +381,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
               <span className="text-lg">{character.avatar}</span>
             )}
             <span className="text-sm font-medium text-ink">{character.name}</span>
+            {sending && <span className="text-xs text-gray-500">对方正在输入…</span>}
           </div>
         )}
         <div className="flex-1" />
@@ -264,10 +392,24 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3" onClick={() => inputRef.current?.focus()}>
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <p className="text-xs text-gray-600">发送消息开始对话</p>
+            <p className="text-xs text-gray-600">聊点什么吧</p>
           </div>
         ) : (
-          <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+          <>
+            {hasMoreMessages && (
+              <div className="flex justify-center py-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleLoadEarlier();
+                  }}
+                  className="text-xs text-life-cyan hover:underline"
+                >
+                  ↑ 加载更早的消息
+                </button>
+              </div>
+            )}
+            <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
             {virtualizer.getVirtualItems().map((vi) => {
               const row = rows[vi.index];
               return (
@@ -296,11 +438,13 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
                     animate={Date.now() - row.message.createdAt < 800}
                     onQuote={setReplyingTo}
                     onDelete={(m) => void deleteMessage(m.id)}
+                    onRetry={(m) => void handleRetry(m)}
                   />
                 </div>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
         {sending && (
           <div className="flex items-start gap-2 mb-4 animate-message-in">

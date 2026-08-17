@@ -22,6 +22,10 @@ const noop: VirtuGeneAPI = {
   emotion: {
     analyze: async () => ({ error: '未在 Electron 环境中运行' }),
   },
+  context: {
+    settle: async () => ({ error: '未在 Electron 环境中运行' }),
+    summarize: async () => ({ error: '未在 Electron 环境中运行' }),
+  },
   shell: {
     open: async () => false,
   },

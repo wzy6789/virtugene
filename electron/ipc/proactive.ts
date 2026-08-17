@@ -9,8 +9,10 @@ export function registerProactiveIPC() {
     lastMessages: { role: string; content: string }[];
     affinity?: number;
     mood?: number;
+    lastMessageAt?: number;
   }) => {
     try {
+      // 消息提醒在渲染层以「应用内流体云」呈现，不做桌面系统通知
       const content = await generateProactiveMessage(params);
       return { content };
     } catch (err: any) {

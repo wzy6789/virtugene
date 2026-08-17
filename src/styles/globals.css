@@ -73,6 +73,20 @@ html, body, #root {
   background: rgba(108, 92, 231, 0.5);
 }
 
+/* 左栏联系人面板滚动条：比全局略宽（8px），微信式 */
+.contacts-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.contacts-scroll::-webkit-scrollbar-thumb {
+  background: rgba(108, 92, 231, 0.35);
+  border-radius: 4px;
+}
+
+.contacts-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(108, 92, 231, 0.55);
+}
+
 /* Title bar drag region */
 .drag-region {
   -webkit-app-region: drag;
@@ -163,4 +177,15 @@ html, body, #root {
   background: #00CEC9;
   animation: milestoneParticle 1.6s ease-out infinite;
   pointer-events: none;
+}
+
+/* Notification cloud — fluid float-in (blur dissolve → settle) */
+@keyframes cloudIn {
+  0% { opacity: 0; transform: translateY(-18px) scale(0.9); filter: blur(6px); }
+  60% { opacity: 1; transform: translateY(2px) scale(1.02); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.animate-cloud-in {
+  animation: cloudIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }

@@ -8,6 +8,7 @@ import { registerFileIPC } from './ipc/file';
 import { registerProactiveIPC } from './ipc/proactive';
 import { registerMemoryIPC } from './ipc/memory';
 import { registerEmotionIPC } from './ipc/emotion';
+import { registerContextIPC } from './ipc/context';
 import { registerUpdater } from './updater';
 
 const isDev = !app.isPackaged;
@@ -62,6 +63,7 @@ app.whenReady().then(() => {
   registerProactiveIPC();
   registerMemoryIPC();
   registerEmotionIPC();
+  registerContextIPC();
 
   const win = createWindow();
 

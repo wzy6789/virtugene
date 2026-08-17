@@ -24,7 +24,6 @@ function useProactiveTimer() {
       // Random interval: 2-5 minutes for subsequent messages
       const delay = 120000 + Math.random() * 180000;
       timerRef.current = setTimeout(async () => {
-        console.log('[proactive] timer fired, triggering...');
         await triggerProactive();
         schedule();
       }, delay);
@@ -32,9 +31,7 @@ function useProactiveTimer() {
 
     // First trigger after 15-45 seconds
     const firstDelay = 15000 + Math.random() * 30000;
-    console.log(`[proactive] first trigger in ${Math.round(firstDelay / 1000)}s`);
     timerRef.current = setTimeout(async () => {
-      console.log('[proactive] first timer fired');
       await triggerProactive();
       schedule();
     }, firstDelay);
@@ -43,6 +40,26 @@ function useProactiveTimer() {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [isLoggedIn]);
+}
+
+/** 自动情绪结算完成后的轻提示（短暂展示，不打扰） */
+function SettleToast() {
+  const notice = useEmotionStore((s) => s.settleNotice);
+  const clearSettleNotice = useEmotionStore((s) => s.clearSettleNotice);
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(clearSettleNotice, 2500);
+    return () => clearTimeout(t);
+  }, [notice, clearSettleNotice]);
+
+  if (!notice) return null;
+  return (
+    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[65] pointer-events-none animate-cloud-in glass-card rounded-full px-4 py-1.5 text-xs text-ink shadow-lg flex items-center gap-1.5">
+      <span>🧬</span>
+      <span>{notice}</span>
+    </div>
+  );
 }
 
 export function ChatPage() {
@@ -82,7 +99,8 @@ export function ChatPage() {
   );
 
   return (
-    <div className="h-full flex">
+    <div className="relative h-full flex">
+      <SettleToast />
       <div className="flex-1 min-w-0 flex flex-col">
         <ChatWindow emotionToggle={emotionToggle} />
       </div>

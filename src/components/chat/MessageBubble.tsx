@@ -10,16 +10,21 @@ interface Props {
   animate?: boolean;
   onQuote?: (message: Message) => void;
   onDelete?: (message: Message) => void;
+  onRetry?: (message: Message) => void;
 }
 
-export function MessageBubble({ message, avatar, animate, onQuote, onDelete }: Props) {
+export function MessageBubble({ message, avatar, animate, onQuote, onDelete, onRetry }: Props) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!menu) return;
-    const handler = () => setMenu(null);
+    const handler = () => {
+      setMenu(null);
+      setConfirmDelete(false);
+    };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
   }, [menu]);
@@ -42,6 +47,19 @@ export function MessageBubble({ message, avatar, animate, onQuote, onDelete }: P
       animate ? 'animate-message-in' : ''
     }`}>
       <Avatar avatar={avatar} size="sm" />
+      {isUser && message.failed && (
+        <button
+          onClick={() => onRetry?.(message)}
+          title="发送失败，点击重发"
+          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-red-400 hover:bg-red-500/10 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </button>
+      )}
       <div className="relative max-w-[75%]">
         <div
           onContextMenu={handleContextMenu}
@@ -89,34 +107,61 @@ export function MessageBubble({ message, avatar, animate, onQuote, onDelete }: P
       {menu &&
         createPortal(
           <div
-            className="fixed z-[60] min-w-[120px] py-1.5 glass-card rounded-xl shadow-2xl"
+            className="fixed z-[60] min-w-[140px] py-1.5 glass-card rounded-xl shadow-2xl"
             style={{ left: menu.x + 4, top: menu.y + 4 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={handleCopy}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
-            >
-              📋 复制
-            </button>
-            <button
-              onClick={() => {
-                onQuote?.(message);
-                setMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
-            >
-              💬 引用
-            </button>
-            <button
-              onClick={() => {
-                onDelete?.(message);
-                setMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-            >
-              🗑️ 删除
-            </button>
+            {confirmDelete ? (
+              <div className="px-4 py-2">
+                <p className="text-sm text-sub mb-1">删除这条消息？</p>
+                <p className="text-xs text-gray-500 mb-3">这段基因序列将被永久抹除</p>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => {
+                      setConfirmDelete(false);
+                      setMenu(null);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:bg-surface transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={() => {
+                      onDelete?.(message);
+                      setMenu(null);
+                      setConfirmDelete(false);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={handleCopy}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
+                >
+                  📋 复制
+                </button>
+                <button
+                  onClick={() => {
+                    onQuote?.(message);
+                    setMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
+                >
+                  💬 引用
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  🗑️ 删除
+                </button>
+              </>
+            )}
           </div>,
           document.body,
         )}

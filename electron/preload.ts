@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('virtugene', {
       lastMessages: { role: string; content: string }[];
       affinity?: number;
       mood?: number;
+      lastMessageAt?: number;
     }) => ipcRenderer.invoke('proactive:generate', params),
   },
   memory: {
@@ -64,6 +65,17 @@ contextBridge.exposeInMainWorld('virtugene', {
       history: { role: string; content: string }[];
       characterName: string;
     }) => ipcRenderer.invoke('emotion:analyze', params),
+  },
+  context: {
+    settle: (params: {
+      apiKey: string;
+      history: { role: string; content: string }[];
+      characterName: string;
+    }) => ipcRenderer.invoke('context:settle', params),
+    summarize: (params: {
+      apiKey: string;
+      history: { role: string; content: string }[];
+    }) => ipcRenderer.invoke('context:summarize', params),
   },
   update: {
     check: () => ipcRenderer.invoke('update:check'),

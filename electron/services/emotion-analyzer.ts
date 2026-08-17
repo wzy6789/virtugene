@@ -81,8 +81,6 @@ export async function analyzeEmotion(params: AnalyzeEmotionParams): Promise<Anal
     const data = await response.json();
     const choice = data.choices?.[0];
     const text: string = choice?.message?.content ?? '';
-    console.log('[emotion-analyzer] finish_reason:', choice?.finish_reason, '| completion_tokens:', data.usage?.completion_tokens);
-    console.log('[emotion-analyzer] raw response:', JSON.stringify(text));
 
     return parseEmotionJSON(text);
   } catch (err: any) {
@@ -107,7 +105,7 @@ function parseEmotionJSON(text: string): AnalyzeEmotionResult {
     const parsed = JSON.parse(clean(text));
     return validateResult(parsed);
   } catch (e) {
-    console.error('[emotion-analyzer] JSON parse failed, text:', text.slice(0, 300));
+    console.warn('[emotion-analyzer] JSON parse failed');
     // Try regex extraction of JSON object
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {

@@ -56,6 +56,10 @@ export interface Session {
   createdAt: number;
   updatedAt: number;
   unreadCount: number;
+  /** 长会话滚动摘要（早期对话的压缩文本，超出保留窗口后生成） */
+  summary?: string;
+  /** 摘要覆盖到的时间点（早于该时间戳的消息均已纳入摘要） */
+  summaryUpdatedAt?: number;
 }
 
 export interface Message {
@@ -69,6 +73,8 @@ export interface Message {
   replyToId?: string;
   /** 引用回复的目标消息内容（用于气泡内展示） */
   replyToContent?: string;
+  /** 发送失败标记（微信式：失败消息显示红色感叹号，点击重发） */
+  failed?: boolean;
 }
 
 export interface MemoryItem {
@@ -95,6 +101,8 @@ export interface EmotionSnapshot {
   sessionId: string;
   dimensions: EmotionDimensions;
   dominantEmotion: string;
+  /** 结算时感知到的用户情绪（如"开心""低落"），用于注入下次回复 */
+  userEmotion?: string;
   summary: string;
   messageCount: number;
   createdAt: number;
@@ -227,6 +235,17 @@ export class VirtuGeneDB extends Dexie {
         st.milestones = st.milestones ?? [];
         st.affinity = 0;
       });
+    });
+    // v12: 复合索引 — 消息按 [sessionId+createdAt] 高效取最近 N 条 / 末条；
+    //      会话按 [characterId+userId] 免去 JS 过滤。纯索引变更，无数据升级。
+    this.version(12).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,userId,[characterId+userId],updatedAt',
+      messages: 'id,sessionId,[sessionId+createdAt]',
+      memories: 'id,characterId,userId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+      characterStates: '[characterId+userId]',
     });
   }
 }

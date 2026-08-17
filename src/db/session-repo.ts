@@ -2,10 +2,11 @@ import { db, type Session } from './index';
 
 export const sessionRepo = {
   async getByCharacter(characterId: string, userId: string): Promise<Session[]> {
-    const sessions = await db.sessions.where('characterId').equals(characterId).toArray();
-    return sessions
-      .filter((s) => s.userId === userId)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    const sessions = await db.sessions
+      .where('[characterId+userId]')
+      .equals([characterId, userId])
+      .toArray();
+    return sessions.sort((a, b) => b.updatedAt - a.updatedAt);
   },
 
   async getById(id: string): Promise<Session | undefined> {
@@ -22,6 +23,10 @@ export const sessionRepo = {
 
   async touch(id: string): Promise<number> {
     return db.sessions.update(id, { updatedAt: Date.now() });
+  },
+
+  async updateSummary(id: string, summary: string): Promise<number> {
+    return db.sessions.update(id, { summary, summaryUpdatedAt: Date.now() });
   },
 
   async deleteById(id: string): Promise<void> {
@@ -44,9 +49,10 @@ export const sessionRepo = {
   },
 
   async getUnreadByCharacter(characterId: string, userId: string): Promise<number> {
-    const sessions = await db.sessions.where('characterId').equals(characterId).toArray();
-    return sessions
-      .filter((s) => s.userId === userId)
-      .reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);
+    const sessions = await db.sessions
+      .where('[characterId+userId]')
+      .equals([characterId, userId])
+      .toArray();
+    return sessions.reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);
   },
 };

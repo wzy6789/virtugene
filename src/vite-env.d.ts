@@ -18,7 +18,9 @@ interface VirtuGeneAPI {
       systemPrompt: string;
       message: string;
       history: { role: 'user' | 'assistant'; content: string }[];
-    }) => Promise<{ content?: string; error?: string }>;
+      retryHint?: string;
+      temperature?: number;
+    }) => Promise<{ content?: string; error?: string; truncated?: boolean }>;
   };
   shell: {
     open: (url: string) => Promise<boolean>;
@@ -64,6 +66,7 @@ interface VirtuGeneAPI {
       lastMessages: { role: string; content: string }[];
       affinity?: number;
       mood?: number;
+      lastMessageAt?: number;
     }) => Promise<{ content?: string; error?: string }>;
   };
   memory: {
@@ -83,6 +86,24 @@ interface VirtuGeneAPI {
       summary?: string;
       error?: string;
     }>;
+  };
+  context: {
+    settle: (params: {
+      apiKey: string;
+      history: { role: string; content: string }[];
+      characterName: string;
+    }) => Promise<{
+      memories?: string[];
+      dimensions?: { valence: number; arousal: number; intimacy: number; engagement: number; expressiveness: number; stability: number };
+      dominantEmotion?: string;
+      userEmotion?: string;
+      summary?: string;
+      error?: string;
+    }>;
+    summarize: (params: {
+      apiKey: string;
+      history: { role: string; content: string }[];
+    }) => Promise<{ summary?: string; error?: string }>;
   };
   window: {
     minimize: () => void;

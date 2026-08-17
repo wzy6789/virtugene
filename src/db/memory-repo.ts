@@ -8,6 +8,15 @@ export const memoryRepo = {
     return all.filter((m) => m.userId === userId).sort((a, b) => a.createdAt - b.createdAt);
   },
 
+  /** 取最近 limit 条记忆（新→旧），用于注入回复上下文，避免全量记忆撑爆 token */
+  async getRecentByCharacter(characterId: string, userId: string, limit = 15): Promise<MemoryItem[]> {
+    const all = await db.memories.where('characterId').equals(characterId).toArray();
+    return all
+      .filter((m) => m.userId === userId)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+  },
+
   async create(memory: MemoryItem): Promise<string> {
     return db.memories.add(memory);
   },

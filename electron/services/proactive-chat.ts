@@ -1,3 +1,5 @@
+import { stripRoleplayActions } from './text';
+
 const PROACTIVE_INSTRUCTION =
   '你是下面描述的角色。用户已经有一段时间没有给你发消息了。请基于你的性格，主动发起一次自然的对话。\n\n' +
   '要求：\n' +
@@ -7,17 +9,9 @@ const PROACTIVE_INSTRUCTION =
   '- 可以是一句突如其来的感慨、一个问题、一个分享、或者一个撒娇\n' +
   '- 不要用"你好"、"在吗"这类模板化开场\n' +
   '- 不要在消息中提到"主动发消息"、"推送"等机制性词汇\n' +
+  '- 不要用任何 Markdown 或列表符号（#、*、-、数字编号），就是纯文本打字\n' +
   '- 不要用括号描述动作或表情\n' +
   '- 直接输出消息正文，不要任何前缀或后缀';
-
-function stripRoleplayActions(text: string): string {
-  return text
-    .replace(/（[^（）]*）/g, '')
-    .replace(/\([^()]*\)/g, '')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
 
 export interface ProactiveMessageParams {
   apiKey: string;
@@ -26,10 +20,27 @@ export interface ProactiveMessageParams {
   characterName: string;
   affinity?: number;
   mood?: number;
+  /** 最后一条消息的时间戳，用于感知「多久没联系了」 */
+  lastMessageAt?: number;
+}
+
+function buildTimeContext(lastMessageAt?: number): string {
+  const now = new Date();
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const pad = (n: number) => String(n).padStart(2, '0');
+  let text = `现在是${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  if (lastMessageAt) {
+    const diffMin = Math.round((Date.now() - lastMessageAt) / 60000);
+    if (diffMin >= 60) {
+      const hours = Math.floor(diffMin / 60);
+      text += hours < 24 ? `，距上次聊天约 ${hours} 小时` : `，距上次聊天约 ${Math.floor(hours / 24)} 天`;
+    }
+  }
+  return text + '。';
 }
 
 export async function generateProactiveMessage(params: ProactiveMessageParams): Promise<string> {
-  const { apiKey, systemPrompt, lastMessages, characterName, affinity, mood } = params;
+  const { apiKey, systemPrompt, lastMessages, characterName, affinity, mood, lastMessageAt } = params;
 
   const contextLines = lastMessages.slice(-6).map((m) => {
     const label = m.role === 'user' ? '用户' : characterName;
@@ -46,6 +57,8 @@ export async function generateProactiveMessage(params: ProactiveMessageParams): 
   if (contextLines.length > 0) {
     systemContent += '\n\n最近的对话记录：\n' + contextLines.join('\n');
   }
+  // 时间感知：让角色知道现在几点、多久没联系了
+  systemContent += '\n\n' + buildTimeContext(lastMessageAt);
 
   const messages = [
     { role: 'system', content: systemContent },

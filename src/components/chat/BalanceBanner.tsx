@@ -1,6 +1,6 @@
 import { ipc } from '../../lib/ipc-client';
 
-export type ChatError = 'auth:invalid_key' | 'billing:insufficient' | 'rate:limited' | 'server:error' | null;
+export type ChatError = 'auth:invalid_key' | 'billing:insufficient' | 'rate:limited' | 'server:error' | 'timeout' | null;
 
 const ERROR_MAP: Record<string, { text: string; action?: string; link?: string }> = {
   'auth:invalid_key': {
@@ -17,6 +17,9 @@ const ERROR_MAP: Record<string, { text: string; action?: string; link?: string }
   },
   'server:error': {
     text: '基因链接中断，请重试',
+  },
+  'timeout': {
+    text: '基因链接超时，请重试',
   },
 };
 
