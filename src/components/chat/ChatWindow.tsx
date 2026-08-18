@@ -374,7 +374,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       {/* Header */}
       <div className="h-12 flex items-center px-4 border-b border-line shrink-0">
         {character && (
-          <div className="flex items-center gap-2">
+          <div key={selectedCharacterId} className="animate-fade-in flex items-center gap-2">
             {character.avatar.startsWith('data:') ? (
               <img src={character.avatar} alt={character.name} className="w-7 h-7 rounded-lg object-cover" />
             ) : (
@@ -388,8 +388,9 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
         {emotionToggle}
       </div>
 
-      {/* Messages — click anywhere to focus input, like WeChat */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3" onClick={() => inputRef.current?.focus()}>
+      {/* Messages — click anywhere to focus input, like WeChat。
+          切换会话时淡入（key 触发重挂载 + 淡入动画，滚动位置由 scrollToLatest 接管） */}
+      <div key={currentSessionId} ref={scrollRef} className="animate-message-in flex-1 overflow-y-auto px-4 py-3" onClick={() => inputRef.current?.focus()}>
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <p className="text-xs text-gray-600">聊点什么吧</p>
@@ -436,6 +437,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
                     message={row.message}
                     avatar={row.avatar}
                     animate={Date.now() - row.message.createdAt < 800}
+                    isLatest={vi.index === rows.length - 1}
                     onQuote={setReplyingTo}
                     onDelete={(m) => void deleteMessage(m.id)}
                     onRetry={(m) => void handleRetry(m)}
@@ -451,7 +453,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
             <Avatar avatar={character?.avatar ?? '🧬'} size="sm" />
             <div className="bg-msgai text-gray-400 text-sm px-4 py-3 rounded-2xl rounded-bl-md border-l-2 border-life-cyan flex items-center gap-1.5">
               <span>对方正在输入</span>
-              <span className="inline-flex gap-1">
+              <span className="typing-glow inline-flex gap-1 rounded-full">
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />

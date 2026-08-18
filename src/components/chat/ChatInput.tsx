@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useRipple } from '../../lib/ripple';
 
 export interface ChatInputHandle {
   focus: () => void;
@@ -12,6 +13,7 @@ interface Props {
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ onSend, disabled }, ref) {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const ripple = useRipple();
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
@@ -61,12 +63,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           placeholder="发消息…"
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none bg-surface border border-line-strong rounded-xl px-4 py-3 text-sm text-ink placeholder-gray-500 focus:outline-none focus:border-gene-purple transition-colors disabled:opacity-40"
+          className="flex-1 resize-none bg-surface border border-line-strong rounded-xl px-4 py-3 text-sm text-ink placeholder-gray-500 outline-none focus:border-gene-purple focus:shadow-[0_0_0_3px_rgba(108,92,231,0.14),0_0_18px_rgba(108,92,231,0.22)] transition-all disabled:opacity-40"
         />
         <button
           onClick={handleSend}
+          onPointerDown={ripple.onPointerDown}
           disabled={disabled || !text.trim()}
-          className="shrink-0 w-10 h-10 rounded-xl bg-gene-purple text-white flex items-center justify-center hover:bg-[#5B4BD4] transition-colors disabled:opacity-30"
+          className="ripple-host shrink-0 w-10 h-10 rounded-xl bg-gene-purple text-white flex items-center justify-center hover:bg-[#5B4BD4] shadow-[0_2px_12px_rgba(108,92,231,0.35)] transition-all disabled:opacity-30 disabled:shadow-none"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />

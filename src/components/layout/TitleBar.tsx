@@ -10,7 +10,9 @@ export function TitleBar() {
   };
 
   return (
-    <header className="drag-region h-9 flex items-center justify-between bg-app border-b border-line select-none shrink-0">
+    <header className="relative drag-region h-9 flex items-center justify-between bg-app border-b border-line select-none shrink-0">
+      {/* 底部紫青光带（光感） */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gene-purple/50 to-life-cyan/30 pointer-events-none" />
       {/* Logo */}
       <div className="flex items-center gap-2 pl-4">
         <span className="text-xl">🧬</span>

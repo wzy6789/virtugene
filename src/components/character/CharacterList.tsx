@@ -27,10 +27,10 @@ function formatTime(ts: number): string {
 
 const LEVEL_TAG_CLASS: Record<string, string> = {
   初识: 'bg-gray-500/10 text-gray-400',
-  熟悉: 'bg-life-cyan/10 text-life-cyan',
-  亲近: 'bg-gene-purple/15 text-gene-purple',
-  挚友: 'bg-amber-500/15 text-amber-500',
-  知己: 'bg-pink-500/15 text-pink-400',
+  熟悉: 'bg-life-cyan/10 text-life-cyan shadow-[0_0_6px_rgba(0,206,201,0.25)]',
+  亲近: 'bg-gene-purple/15 text-gene-purple shadow-[0_0_6px_rgba(108,92,231,0.30)]',
+  挚友: 'bg-amber-500/15 text-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.30)]',
+  知己: 'bg-pink-500/15 text-pink-400 shadow-[0_0_6px_rgba(244,114,182,0.30)]',
 };
 
 export function CharacterList({ collapsed }: Props) {
@@ -83,18 +83,27 @@ export function CharacterList({ collapsed }: Props) {
         <button
           onClick={() => selectCharacter(char.id)}
           onContextMenu={(e) => handleContextMenu(e, char)}
-          className={`relative w-full flex items-center gap-3 px-3 py-3 text-left transition-colors ${
+          className={`relative w-full flex items-center gap-3 px-3 py-3 text-left transition-all ${
             selectedId === char.id
-              ? 'bg-gene-purple/10'
+              ? 'bg-gene-purple/10 shadow-[inset_3px_0_0_0_#6C5CE7,0_2px_14px_rgba(108,92,231,0.14)]'
               : char.pinned
-                ? 'bg-amber-400/[0.06] hover:bg-amber-400/10'
-                : 'hover:bg-surface'
+                ? 'bg-amber-400/[0.06] hover:bg-amber-400/10 hover:shadow-[inset_2px_0_0_0_rgba(108,92,231,0.20)]'
+                : 'hover:bg-surface hover:shadow-[inset_2px_0_0_0_rgba(108,92,231,0.20)]'
           }`}
         >
           {char.avatar.startsWith('data:') ? (
-            <img src={char.avatar} alt={char.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-gene-purple to-life-cyan opacity-40 blur-[3px]" />
+              <img src={char.avatar} alt={char.name} className="relative w-8 h-8 rounded-xl object-cover ring-1 ring-gene-purple/20" />
+            </div>
           ) : (
-            <span className="text-2xl shrink-0">{char.avatar}</span>
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#2A2A48] to-[#0A0A14]" />
+              <div className="absolute inset-0 rounded-xl bg-gene-purple/25 blur-[3px]" />
+              <span className="relative w-8 h-8 rounded-xl flex items-center justify-center text-xl">
+                {char.avatar}
+              </span>
+            </div>
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-1">
@@ -102,13 +111,8 @@ export function CharacterList({ collapsed }: Props) {
                 <p className={`text-sm truncate ${selectedId === char.id ? 'text-ink font-medium' : 'text-sub'}`}>
                   {char.name}
                 </p>
-                {char.pinned && (
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0 leading-none">
-                    顶
-                  </span>
-                )}
                 <span
-                  className={`text-[9px] px-1 py-0.5 rounded shrink-0 leading-none ${
+                  className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 leading-none font-medium ${
                     LEVEL_TAG_CLASS[level.level.name] ?? 'bg-gray-500/10 text-gray-400'
                   }`}
                 >
@@ -171,14 +175,16 @@ export function CharacterList({ collapsed }: Props) {
               key={char.id}
               onClick={() => selectCharacter(char.id)}
               onContextMenu={(e) => handleContextMenu(e, char)}
-              className={`w-full flex items-center justify-center py-2.5 rounded-xl transition-colors relative ${
-                selectedId === char.id ? 'bg-gene-purple/20' : 'hover:bg-surface'
+              className={`w-full flex items-center justify-center py-2.5 rounded-xl transition-all relative ${
+                selectedId === char.id ? 'bg-gene-purple/20 shadow-[0_2px_12px_rgba(108,92,231,0.25)]' : 'hover:bg-surface'
               }`}
             >
               {char.avatar.startsWith('data:') ? (
-                <img src={char.avatar} alt={char.name} className="w-7 h-7 rounded-lg object-cover" />
+                <img src={char.avatar} alt={char.name} className="w-7 h-7 rounded-lg object-cover ring-1 ring-gene-purple/20" />
               ) : (
-                <span className="text-xl">{char.avatar}</span>
+                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#2A2A48] to-[#0A0A14] flex items-center justify-center text-base">
+                  {char.avatar}
+                </span>
               )}
               {unread > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
@@ -197,7 +203,7 @@ export function CharacterList({ collapsed }: Props) {
       <div>
         {/* Search */}
         <div className="px-3 pt-2 pb-2">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-transparent focus-within:border-gene-purple/40 focus-within:shadow-[0_0_0_3px_rgba(108,92,231,0.10),0_0_12px_rgba(108,92,231,0.15)] transition-all">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-gray-400 shrink-0">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
@@ -225,11 +231,6 @@ export function CharacterList({ collapsed }: Props) {
           <p className="px-4 py-8 text-center text-xs text-gray-500">未找到匹配的基因序列</p>
         )}
 
-        {pinnedChars.length > 0 && (
-          <div className="px-4 pt-1 pb-1">
-            <p className="text-[10px] text-gray-500">置顶</p>
-          </div>
-        )}
         {pinnedChars.map((char, i) => renderCharRow(char, i > 0))}
 
         {pinnedChars.length > 0 && normalChars.length > 0 && (

@@ -2,15 +2,16 @@ import { useEffect } from 'react';
 import { useEmotionStore } from '../../store/emotion-store';
 import { useChatStore } from '../../store/chat-store';
 import { useCharacterStateStore } from '../../store/character-state-store';
+import { useRipple } from '../../lib/ripple';
 import { EmotionChart } from './EmotionChart';
 import { EmotionCurve } from './EmotionCurve';
 import { getRelationLevel, levelProgress } from '../../lib/affinity';
 import { useResizable } from '../../hooks/useResizable';
 import type { EmotionDimensions } from '../../db/index';
 
-const PANEL_DEFAULT = 280;
-const PANEL_MIN = 260;
-const PANEL_MAX = 400;
+const PANEL_DEFAULT = 320;
+const PANEL_MIN = 300;
+const PANEL_MAX = 420;
 
 const DIM_LABELS: { key: keyof EmotionDimensions; label: string }[] = [
   { key: 'valence', label: '愉悦度' },
@@ -51,6 +52,18 @@ function moodColor(mood: number): string {
   return '#F87171';
 }
 
+function valenceDotClass(valence: number) {
+  if (valence >= 7.5) return 'bg-life-cyan shadow-[0_0_6px_rgba(0,206,201,0.6)]';
+  if (valence >= 5) return 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]';
+  if (valence >= 2.5) return 'bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.6)]';
+  return 'bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.6)]';
+}
+
+/** 分区小标题（统一克制风格） */
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] tracking-[0.2em] text-gray-500 uppercase">{children}</p>;
+}
+
 export function EmotionPanel() {
   const isPanelOpen = useEmotionStore((s) => s.isPanelOpen);
   const isAnalyzing = useEmotionStore((s) => s.isAnalyzing);
@@ -61,6 +74,7 @@ export function EmotionPanel() {
   const closePanel = useEmotionStore((s) => s.closePanel);
   const analyzeCurrentSession = useEmotionStore((s) => s.analyzeCurrentSession);
   const loadSessionSnapshots = useEmotionStore((s) => s.loadSessionSnapshots);
+  const ripple = useRipple();
 
   const selectedCharacterId = useChatStore((s) => s.selectedCharacterId);
   const currentSessionId = useChatStore((s) => s.currentSessionId);
@@ -135,39 +149,62 @@ export function EmotionPanel() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {/* 关系档案 */}
-          <div className="rounded-xl bg-surface border border-line p-3 space-y-3">
-            {/* 等级名 + 说明 */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-baseline gap-2 min-w-0">
-                <span className="text-lg font-bold milestone-level">{relation.level.name}</span>
-                <span className="text-xs text-gray-500 truncate">{relation.level.desc}</span>
+          {/* 灵魂状态总览卡 */}
+          <div className="relative overflow-hidden rounded-xl border border-gene-purple/25 bg-gradient-to-br from-gene-purple/12 via-transparent to-life-cyan/10 p-4 space-y-3">
+            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-gene-purple/20 blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-life-cyan/15 blur-2xl pointer-events-none" />
+
+            <div className="relative flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <SectionTitle>灵魂状态</SectionTitle>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-lg font-bold milestone-level">{relation.level.name}</span>
+                  <span className="text-xs text-gray-500 truncate">{relation.level.desc}</span>
+                </div>
+                {currentSnapshot && (
+                  <span
+                    className={`inline-flex mt-2 text-xs px-2.5 py-0.5 rounded-full border ${getValenceBadgeClass(currentSnapshot.dimensions.valence)}`}
+                  >
+                    {currentSnapshot.dominantEmotion}
+                  </span>
+                )}
               </div>
-              <span className="text-xs tabular-nums text-gray-400 shrink-0">{Math.round(affinity)}/100</span>
+              <div className="shrink-0 text-right">
+                <p className="text-xs text-gray-500">好感度</p>
+                <p className="text-lg font-semibold tabular-nums text-ink">
+                  {Math.round(affinity)}<span className="text-sm text-gray-400">/100</span>
+                </p>
+                <div className="mt-1 flex items-center justify-end gap-1.5">
+                  <span className="text-sm tabular-nums font-medium" style={{ color: moodColor(mood) }}>
+                    {Math.round(mood)}
+                  </span>
+                  <span className="text-xs text-gray-500">心情</span>
+                </div>
+              </div>
             </div>
 
             {/* 到下一级进度 */}
             {relation.next ? (
-              <div>
+              <div className="relative">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-gray-500">距离「{relation.next.name}」</span>
-                  <span className="text-[10px] tabular-nums text-gray-400">{Math.round(progress)}%</span>
+                  <span className="text-xs text-gray-500">距离「{relation.next.name}」</span>
+                  <span className="text-xs tabular-nums text-gray-400">{Math.round(progress)}%</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-surface overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-gene-purple to-life-cyan transition-all duration-500"
+                    className="h-full rounded-full bg-gradient-to-r from-gene-purple to-life-cyan transition-all duration-500 shadow-[0_0_8px_rgba(108,92,231,0.40)]"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
               </div>
             ) : (
-              <div className="text-[10px] text-gray-500">已达最高等级，灵魂同频</div>
+              <div className="relative text-[10px] text-gray-500">已达最高等级，灵魂同频</div>
             )}
 
             {/* 里程碑时间线 */}
             {milestones.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">关系里程碑</p>
+              <div className="relative space-y-1">
+                <SectionTitle>关系里程碑</SectionTitle>
                 <div className="space-y-0.5">
                   {milestones.map((m) => (
                     <div key={m.reachedAt} className="flex items-center justify-between text-xs">
@@ -180,43 +217,28 @@ export function EmotionPanel() {
             )}
 
             {/* 对话统计 */}
-            <div className="grid grid-cols-3 gap-1 pt-2 border-t border-line">
+            <div className="relative grid grid-cols-3 gap-1 pt-2 border-t border-line">
               <div className="text-center">
                 <div className="text-sm font-semibold tabular-nums text-ink">{messages.length}</div>
-                <div className="text-[10px] text-gray-500">消息</div>
+                <div className="text-xs text-gray-500">消息</div>
               </div>
               <div className="text-center">
                 <div className="text-sm font-semibold tabular-nums text-ink">{daysKnown}</div>
-                <div className="text-[10px] text-gray-500">相识天数</div>
+                <div className="text-xs text-gray-500">相识天数</div>
               </div>
               <div className="text-center">
                 <div className="text-sm font-semibold tabular-nums text-ink">{snapshots.length}</div>
-                <div className="text-[10px] text-gray-500">情绪图谱</div>
+                <div className="text-xs text-gray-500">情绪图谱</div>
               </div>
-            </div>
-          </div>
-
-          {/* 心情 */}
-          <div className="rounded-xl bg-surface border border-line p-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-gray-500">心情</span>
-              <span className="text-xs tabular-nums" style={{ color: moodColor(mood) }}>
-                {Math.round(mood)}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-surface overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${mood}%`, backgroundColor: moodColor(mood) }}
-              />
             </div>
           </div>
 
           {/* Analyze button */}
           <button
             onClick={handleAnalyze}
+            onPointerDown={ripple.onPointerDown}
             disabled={isAnalyzing || messages.length === 0}
-            className="w-full py-2.5 rounded-xl bg-gene-purple hover:bg-[#5B4BD4] disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors flex items-center justify-center gap-2"
+            className="ripple-host w-full py-2.5 rounded-xl bg-gene-purple hover:bg-[#5B4BD4] disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none text-sm font-medium text-white transition-all flex items-center justify-center gap-2 shadow-[0_2px_14px_rgba(108,92,231,0.35)]"
           >
             {isAnalyzing ? (
               <>
@@ -249,6 +271,8 @@ export function EmotionPanel() {
           {/* Chart + badge + summary */}
           {currentSnapshot && (
             <>
+              <SectionTitle>情绪图谱</SectionTitle>
+
               {/* Low message warning */}
               {currentSnapshot.messageCount < 4 && (
                 <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
@@ -268,7 +292,7 @@ export function EmotionPanel() {
               {/* 愉悦度曲线 */}
               {snapshots.length >= 2 && (
                 <div className="space-y-1">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">心情曲线</p>
+                  <SectionTitle>心情曲线</SectionTitle>
                   <EmotionCurve snapshots={snapshots} />
                 </div>
               )}
@@ -290,7 +314,7 @@ export function EmotionPanel() {
               {/* Delta indicators */}
               {previousSnapshot && (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">情绪波动追踪</p>
+                  <SectionTitle>情绪波动追踪</SectionTitle>
                   {DIM_LABELS.map(({ key, label }) => {
                     const cur = currentSnapshot.dimensions[key];
                     const prev = previousSnapshot.dimensions[key];
@@ -309,23 +333,20 @@ export function EmotionPanel() {
                 </div>
               )}
 
-              {/* History list */}
+              {/* History — 快照卡片流（横向滚动，点击预览） */}
               {snapshots.length > 1 && (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">历史图谱</p>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <SectionTitle>历史图谱</SectionTitle>
+                  <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
                     {snapshots.slice(1).map((snap) => (
                       <button
                         key={snap.id}
                         onClick={() => handleSelectSnapshot(snap)}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-surface transition-colors text-left"
+                        className="snap-start shrink-0 flex flex-col items-center gap-1 px-2.5 py-2 rounded-xl bg-surface border border-line hover:border-life-cyan/40 hover:shadow-[0_0_10px_rgba(0,206,201,0.12)] transition-all"
                       >
-                        <span className="text-xs text-gray-500">{formatTime(snap.createdAt)}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full border ${getValenceBadgeClass(snap.dimensions.valence)}`}
-                        >
-                          {snap.dominantEmotion}
-                        </span>
+                        <span className={`w-2 h-2 rounded-full ${valenceDotClass(snap.dimensions.valence)}`} />
+                        <span className="text-[10px] text-gray-500 whitespace-nowrap">{snap.dominantEmotion}</span>
+                        <span className="text-[9px] text-gray-400 whitespace-nowrap">{formatTime(snap.createdAt)}</span>
                       </button>
                     ))}
                   </div>

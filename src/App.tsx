@@ -16,11 +16,19 @@ export default function App() {
   const theme = useThemeStore((s) => s.theme);
   const didResize = useRef(false);
   const [ready, setReady] = useState(false);
+  const [splashGone, setSplashGone] = useState(false);
   const [updateNotes, setUpdateNotes] = useState<{ version: string; notes: string[] } | null>(null);
 
   useEffect(() => {
     initSeedCharacters().finally(() => setReady(true));
   }, []);
+
+  // Splash 淡出过渡：ready 后先淡出再卸载
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(() => setSplashGone(true), 400);
+    return () => clearTimeout(t);
+  }, [ready]);
 
   // Show the update announcement once per version change
   useEffect(() => {
@@ -58,8 +66,12 @@ export default function App() {
     setUpdateNotes(null);
   };
 
-  if (!ready) {
-    return <SplashScreen />;
+  if (!splashGone) {
+    return (
+      <div className={`fixed inset-0 z-[100] bg-app transition-opacity duration-300 ${ready ? 'opacity-0' : 'opacity-100'}`}>
+        <SplashScreen />
+      </div>
+    );
   }
 
   return (

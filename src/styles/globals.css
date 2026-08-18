@@ -46,6 +46,85 @@ html, body, #root {
   background: var(--bg-glass);
   backdrop-filter: blur(24px);
   border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(15, 15, 26, 0.10), 0 0 0 1px rgba(108, 92, 231, 0.04);
+}
+
+/* ============ 1.1.2 沉浸光感 ============ */
+
+/* 氛围光背景层：极慢漂移的紫青光晕（主题感知） */
+:root {
+  --aurora-a: rgba(108, 92, 231, 0.14);
+  --aurora-b: rgba(0, 206, 201, 0.11);
+  --aurora-c: rgba(108, 92, 231, 0.10);
+}
+.dark {
+  --aurora-a: rgba(108, 92, 231, 0.24);
+  --aurora-b: rgba(0, 206, 201, 0.16);
+  --aurora-c: rgba(0, 206, 201, 0.10);
+}
+.aurora {
+  background:
+    radial-gradient(ellipse 55% 45% at 12% 18%, var(--aurora-a), transparent 60%),
+    radial-gradient(ellipse 45% 40% at 88% 28%, var(--aurora-b), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 50% 95%, var(--aurora-c), transparent 65%),
+    radial-gradient(ellipse 40% 35% at 70% 75%, rgba(108, 92, 231, 0.06), transparent 60%);
+  animation: auroraDrift 20s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(1.5%, 1%) scale(1.04); }
+  100% { transform: translate(-1.5%, -0.8%) scale(1.01); }
+}
+
+/* DNA 点阵底纹（极淡，缓慢漂移） */
+.dna-dots {
+  background-image: radial-gradient(rgba(108, 92, 231, 0.10) 1px, transparent 1.5px);
+  background-size: 26px 26px;
+  animation: dotsDrift 40s linear infinite;
+}
+@keyframes dotsDrift {
+  from { background-position: 0 0; }
+  to   { background-position: 52px 52px; }
+}
+
+/* 「正在输入」光点呼吸 */
+@keyframes dotGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(0, 206, 201, 0.20); }
+  50%      { box-shadow: 0 0 10px rgba(0, 206, 201, 0.65); }
+}
+.typing-glow { animation: dotGlow 1.2s ease-in-out infinite; }
+
+/* 点击涟漪（配合 ripple-host 使用） */
+.ripple-host { position: relative; overflow: hidden; }
+@keyframes ripple {
+  from { transform: scale(0); opacity: 0.35; }
+  to   { transform: scale(4); opacity: 0; }
+}
+.ripple-ink {
+  position: absolute;
+  border-radius: 9999px;
+  background: currentColor;
+  pointer-events: none;
+  animation: ripple 0.55s ease-out forwards;
+}
+
+/* 最新一条消息的光晕扫过 */
+@keyframes messageSweep {
+  0%   { box-shadow: 0 0 0 rgba(108, 92, 231, 0); }
+  35%  { box-shadow: 0 0 22px rgba(108, 92, 231, 0.35); }
+  100% { box-shadow: 0 0 0 rgba(108, 92, 231, 0); }
+}
+.animate-message-sweep { animation: messageSweep 1.6s ease-out; }
+
+/* 情绪曲线：最新数据点脉冲呼吸 */
+@keyframes pointPulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.animate-point-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pointPulse 1.8s ease-out infinite;
 }
 
 /* DNA helix background pattern */
@@ -188,4 +267,19 @@ html, body, #root {
 
 .animate-cloud-in {
   animation: cloudIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 流体云：顶部流光扫过（仅限云朵上半部分，避免盖住/冲淡文字） */
+@keyframes cloudShine {
+  0% { transform: translateX(-130%) skewX(-18deg); }
+  55%, 100% { transform: translateX(240%) skewX(-18deg); }
+}
+.cloud-shine {
+  position: absolute;
+  top: 0;
+  height: 46%;
+  width: 38%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.25), rgba(0, 206, 201, 0.10), transparent);
+  animation: cloudShine 3.6s ease-in-out infinite;
+  pointer-events: none;
 }

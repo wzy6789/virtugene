@@ -5,6 +5,7 @@ import { useChatStore } from '../../store/chat-store';
 import { useCharacterStateStore } from '../../store/character-state-store';
 import { useEmotionStore } from '../../store/emotion-store';
 import { ipc } from '../../lib/ipc-client';
+import { useRipple } from '../../lib/ripple';
 import { CharacterList } from '../character/CharacterList';
 import { CharacterAddModal } from '../character/CharacterAddModal';
 import { SettingsPanel } from '../settings/SettingsPanel';
@@ -21,14 +22,15 @@ const SIDEBAR_MIN = 220;
 const SIDEBAR_MAX = 360;
 const SIDEBAR_SNAP = 140;
 
-/** 工具条按钮统一样式 */
+/** 工具条按钮统一样式（带悬停光晕） */
 const RAIL_BTN =
-  'w-9 h-9 flex items-center justify-center rounded-lg text-lg text-gray-400 hover:bg-surface hover:text-ink transition-colors shrink-0';
+  'w-9 h-9 flex items-center justify-center rounded-lg text-lg text-gray-400 hover:bg-surface hover:text-ink hover:shadow-[0_0_12px_rgba(108,92,231,0.25)] transition-all shrink-0 ripple-host';
 
 export function Sidebar() {
   const { theme, toggle } = useThemeStore();
   const logout = useAuthStore((s) => s.logout);
   const avatar = useAuthStore((s) => s.avatar) ?? DEFAULT_USER_AVATAR;
+  const ripple = useRipple();
   const { width, setWidth, isDragging, startDrag } = useResizable({
     initial: SIDEBAR_DEFAULT,
     min: SIDEBAR_COLLAPSED,
@@ -57,48 +59,43 @@ export function Sidebar() {
   return (
     <>
       <aside
-        className={`relative h-full bg-app border-r border-line flex shrink-0 ${
+        className={`relative h-full bg-glass backdrop-blur-xl border-r border-line flex shrink-0 ${
           isDragging ? '' : 'transition-[width] duration-300 ease-in-out'
         }`}
         style={{ width }}
       >
-        {/* 右下角拉伸把手：滚动条贴右缘，拉伸改为小把手（微信式互不干扰） */}
+        {/* 拖拽拉伸条：整条右边缘都可拖（原版样式），悬停变紫提示 */}
         <div
           onMouseDown={startDrag}
-          title="拖拽调整侧栏宽度"
-          className="absolute bottom-0 right-0 w-4 h-8 flex items-center justify-center cursor-col-resize hover:bg-gene-purple/20 transition-colors z-10"
-        >
-          <div className="flex flex-col gap-[3px] items-center">
-            <span className="w-[3px] h-[3px] rounded-full bg-gray-400" />
-            <span className="w-[3px] h-[3px] rounded-full bg-gray-400" />
-            <span className="w-[3px] h-[3px] rounded-full bg-gray-400" />
-          </div>
-        </div>
+          className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-gene-purple/30 transition-colors z-10"
+        />
 
         {/* 左侧工具条 —— 电脑版微信/QQ 风格（工具统一放在上方） */}
         <div className="w-12 shrink-0 border-r border-line flex flex-col items-center py-2 gap-1">
           <span className="text-xl mt-1 mb-2" title="VirtuGene">🧬</span>
 
-          <button onClick={() => setShowProfile(true)} title="个人资料" className={RAIL_BTN}>
-            <Avatar avatar={avatar} size="sm" className="w-7 h-7 text-base" />
+          <button onClick={() => setShowProfile(true)} title="个人资料" className={RAIL_BTN} onPointerDown={ripple.onPointerDown}>
+            <Avatar avatar={avatar} size="sm" className="w-7 h-7 text-base ring-1 ring-gene-purple/30" />
           </button>
-          <button onClick={() => setShowSettings(true)} title="设置" className={RAIL_BTN}>
+          <button onClick={() => setShowSettings(true)} title="设置" className={RAIL_BTN} onPointerDown={ripple.onPointerDown}>
             ⚙️
           </button>
-          <button onClick={toggle} title="切换主题" className={RAIL_BTN}>
+          <button onClick={toggle} title="切换主题" className={RAIL_BTN} onPointerDown={ripple.onPointerDown}>
             {theme === 'dark' ? '🌙' : '☀️'}
           </button>
           <button
             onClick={() => setWidth(collapsed ? SIDEBAR_DEFAULT : SIDEBAR_COLLAPSED)}
             title={collapsed ? '展开侧栏' : '收起侧栏'}
             className={RAIL_BTN}
+            onPointerDown={ripple.onPointerDown}
           >
             {collapsed ? '▶' : '◀'}
           </button>
           <button
             onClick={() => setShowLogoutConfirm(true)}
             title="断开灵魂链接"
-            className={`${RAIL_BTN} hover:bg-red-500/10 hover:text-red-400`}
+            className={`${RAIL_BTN} hover:bg-red-500/10 hover:text-red-400 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)]`}
+            onPointerDown={ripple.onPointerDown}
           >
             ↩
           </button>
@@ -106,19 +103,22 @@ export function Sidebar() {
           <div className="flex-1" />
         </div>
 
-        {/* 联系人面板（可调宽） */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="h-14 flex items-center px-4 border-b border-line shrink-0">
-            <span className="text-base font-bold tracking-wide text-ink">
-              Virtu<span className="text-gene-purple">Gene</span>
+        {/* 联系人面板（可调宽，overflow-hidden 防止收起时内容溢出） */}
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          <div className="relative h-14 flex items-center px-4 border-b border-line shrink-0">
+            {/* 底部紫青光带（品牌感） */}
+            <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-gene-purple/40 to-life-cyan/30 pointer-events-none" />
+            <span className="text-base font-bold tracking-wide bg-gradient-to-r from-gene-purple to-life-cyan bg-clip-text text-transparent">
+              VirtuGene
             </span>
           </div>
 
-          {/* 基因实验室入口 —— 放在「搜索基因」上方 */}
+          {/* 基因实验室入口 —— 放在「搜索基因」上方（常驻青色微光） */}
           <div className="px-3 pt-2 pb-1 shrink-0">
             <button
               onClick={() => setShowAddModal(true)}
-              className="w-full flex items-center gap-3 rounded-xl border border-dashed border-life-cyan/40 text-life-cyan hover:bg-life-cyan/10 hover:border-life-cyan/70 transition-all px-3 py-2"
+              onPointerDown={ripple.onPointerDown}
+              className="ripple-host w-full flex items-center gap-3 rounded-xl border border-dashed border-life-cyan/40 text-life-cyan hover:bg-life-cyan/10 hover:border-life-cyan/70 hover:shadow-[0_2px_18px_rgba(0,206,201,0.28)] transition-all px-3 py-2 shadow-[0_0_10px_rgba(0,206,201,0.12)]"
             >
               <span className="shrink-0">🧬</span>
               <span className="text-sm font-medium">基因实验室</span>

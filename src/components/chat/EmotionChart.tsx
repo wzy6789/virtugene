@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useThemeStore } from '../../store/theme-store';
 import type { EmotionDimensions } from '../../db/index';
 
@@ -32,17 +32,22 @@ function buildPolygonPoints(dims: EmotionDimensions, cx: number, cy: number, max
 
 export function EmotionChart({ dimensions, previousDimensions, size = 220 }: Props) {
   const [hover, setHover] = useState<HoverInfo | null>(null);
+  const uid = useId();
   const cx = size / 2;
   const cy = size / 2;
   const maxR = size * 0.38;
   const levels = [0.2, 0.4, 0.6, 0.8, 1.0];
   const isDark = useThemeStore((s) => s.theme) === 'dark';
-  const gridStroke = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,26,46,0.08)';
+  const gridStroke = isDark ? 'rgba(139,124,247,0.13)' : 'rgba(108,92,231,0.14)';
   const labelFill = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.55)';
   const scaleFill = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(26,26,46,0.25)';
   const pointStroke = isDark ? '#0F0F1A' : '#FFFFFF';
   const tooltipBg = isDark ? 'rgba(15,15,26,0.96)' : 'rgba(255,255,255,0.96)';
   const tooltipText = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(26,26,46,0.7)';
+
+  const fillId = `radar-fill-${uid}`;
+  const strokeId = `radar-stroke-${uid}`;
+  const glowId = `radar-glow-${uid}`;
 
   const hoverValue = hover
     ? (hover.isPrevious ? previousDimensions?.[KEYS[hover.index]] : dimensions[KEYS[hover.index]])
@@ -56,6 +61,20 @@ export function EmotionChart({ dimensions, previousDimensions, size = 220 }: Pro
       className="mx-auto"
       onMouseLeave={() => setHover(null)}
     >
+      <defs>
+        <linearGradient id={fillId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#6C5CE7" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#00CEC9" stopOpacity="0.32" />
+        </linearGradient>
+        <linearGradient id={strokeId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#6C5CE7" />
+          <stop offset="100%" stopColor="#00CEC9" />
+        </linearGradient>
+        <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="3.2" />
+        </filter>
+      </defs>
+
       {/* Grid: concentric hexagons */}
       {levels.map((level) => {
         const points = KEYS.map((_, i) => {
@@ -96,24 +115,34 @@ export function EmotionChart({ dimensions, previousDimensions, size = 220 }: Pro
         <polygon
           points={buildPolygonPoints(previousDimensions, cx, cy, maxR)}
           fill="rgba(108,92,231,0.05)"
-          stroke="rgba(108,92,231,0.3)"
+          stroke="rgba(108,92,231,0.35)"
           strokeWidth="1.5"
           strokeDasharray="3,3"
         />
       )}
 
-      {/* Current data polygon */}
+      {/* Current data polygon — 描边辉光（底层模糊光晕） */}
       <polygon
         points={buildPolygonPoints(dimensions, cx, cy, maxR)}
-        fill="rgba(108,92,231,0.15)"
+        fill="none"
         stroke="#6C5CE7"
+        strokeWidth="5"
+        strokeLinejoin="round"
+        filter={`url(#${glowId})`}
+        opacity="0.5"
+        style={{ animation: 'chartAppear 0.6s ease-out' }}
+      />
+      {/* Current data polygon — 渐变填充 + 渐变描边 */}
+      <polygon
+        points={buildPolygonPoints(dimensions, cx, cy, maxR)}
+        fill={`url(#${fillId})`}
+        stroke={`url(#${strokeId})`}
         strokeWidth="2"
-        style={{
-          animation: 'chartAppear 0.6s ease-out',
-        }}
+        strokeLinejoin="round"
+        style={{ animation: 'chartAppear 0.6s ease-out' }}
       />
 
-      {/* Current data points */}
+      {/* Current data points — 光晕顶点 */}
       {KEYS.map((key, i) => {
         const angle = (360 / KEYS.length) * i;
         const val = dimensions[key] / 10;
@@ -131,8 +160,17 @@ export function EmotionChart({ dimensions, previousDimensions, size = 220 }: Pro
             <circle
               cx={x}
               cy={y}
-              r={active ? 4.5 : 3}
-              fill="#6C5CE7"
+              r={8}
+              fill="rgba(108,92,231,0.35)"
+              filter={`url(#${glowId})`}
+              pointerEvents="none"
+              style={{ transition: 'opacity 0.15s ease-out', opacity: active ? 0.6 : 0.35 }}
+            />
+            <circle
+              cx={x}
+              cy={y}
+              r={active ? 5 : 3.2}
+              fill={`url(#${strokeId})`}
               stroke={pointStroke}
               strokeWidth="1.5"
               pointerEvents="none"

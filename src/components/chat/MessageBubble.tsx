@@ -8,12 +8,14 @@ interface Props {
   message: Message;
   avatar: string;
   animate?: boolean;
+  /** 是否为会话最新一条消息（触发一次性光晕扫过） */
+  isLatest?: boolean;
   onQuote?: (message: Message) => void;
   onDelete?: (message: Message) => void;
   onRetry?: (message: Message) => void;
 }
 
-export function MessageBubble({ message, avatar, animate, onQuote, onDelete, onRetry }: Props) {
+export function MessageBubble({ message, avatar, animate, isLatest, onQuote, onDelete, onRetry }: Props) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -63,10 +65,12 @@ export function MessageBubble({ message, avatar, animate, onQuote, onDelete, onR
       <div className="relative max-w-[75%]">
         <div
           onContextMenu={handleContextMenu}
-          className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+          className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words transition-shadow ${
+            isLatest && !isUser ? 'animate-message-sweep' : ''
+          } ${
             isUser
-              ? 'bg-gene-purple text-white rounded-br-md'
-              : 'bg-msgai text-msgaitxt rounded-bl-md border-l-2 border-life-cyan'
+              ? 'bg-gradient-to-br from-gene-purple to-[#5B4BD4] text-white rounded-br-md shadow-[0_4px_16px_rgba(108,92,231,0.30)]'
+              : 'bg-msgai text-msgaitxt rounded-bl-md border-l-2 border-life-cyan shadow-[0_2px_10px_rgba(0,206,201,0.08)]'
           }`}
         >
           {message.replyToContent && (
