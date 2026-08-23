@@ -12,6 +12,8 @@ interface Props {
   characterName?: string;
   /** 今天日记里已写的内容：据此整理/融合成完整日记 */
   diaryContent?: string;
+  /** 归档日补写：只允许追加，即使 AI 建议替换也显示为追加 */
+  appendOnly?: boolean;
   /** 把（修改后的）初稿写入日记；replace=true 表示直接替换为一段完整文章；tags 为选中的标签；title 为建议标题 */
   onInsert: (text: string, replace?: boolean, tags?: string[], title?: string) => void;
 }
@@ -23,7 +25,7 @@ interface Props {
  * - 只有片段 → 整理成一篇完整日记
  * 生成时同时给出内容相关标签建议，可勾选后随日记保存。
  */
-export function ExtractModal({ open, onClose, characterId, characterName, diaryContent, onInsert }: Props) {
+export function ExtractModal({ open, onClose, characterId, characterName, diaryContent, appendOnly, onInsert }: Props) {
   const apiKey = useAuthStore((s) => s.apiKey);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState('');
@@ -143,7 +145,7 @@ export function ExtractModal({ open, onClose, characterId, characterName, diaryC
                 disabled={!draft.trim()}
                 className="px-4 py-2 rounded-lg text-sm bg-gene-purple hover:bg-[#5B4BD4] text-white transition-all disabled:opacity-40"
               >
-                {replaceRef.current ? '✅ 替换为这篇日记' : '✅ 插入到日记'}
+                {appendOnly ? '✅ 追加到日记末尾' : replaceRef.current ? '✅ 替换为这篇日记' : '✅ 插入到日记'}
               </button>
             </div>
           </>

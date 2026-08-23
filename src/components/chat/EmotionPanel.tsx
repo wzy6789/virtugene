@@ -10,9 +10,10 @@ import { EmotionChart } from './EmotionChart';
 import { EmotionCurve } from './EmotionCurve';
 import { getRelationLevel, levelProgress } from '../../lib/affinity';
 import { useResizable } from '../../hooks/useResizable';
+import { IS_MOBILE } from '../../lib/platform';
 import type { EmotionDimensions } from '../../db/index';
 
-const PANEL_DEFAULT = 320;
+const PANEL_DEFAULT = IS_MOBILE ? 360 : 320;
 const PANEL_MIN = 300;
 const PANEL_MAX = 420;
 
@@ -142,7 +143,9 @@ export function EmotionPanel() {
 
   return (
     <div
-      className="relative h-full flex flex-col bg-app border-l border-line shrink-0 overflow-hidden"
+      className={`relative h-full flex flex-col bg-app border-l border-line shrink-0 overflow-hidden ${
+        IS_MOBILE ? 'absolute inset-y-0 right-0 z-40 shadow-2xl' : ''
+      }`}
       style={{ width: isPanelOpen ? width : 0, opacity: isPanelOpen ? 1 : 0 }}
     >
       {isPanelOpen && (

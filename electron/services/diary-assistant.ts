@@ -87,18 +87,62 @@ const PROMPTS: Record<string, string> = {
     '- 只基于给出的日记与统计，不要编造\n' +
     '- 直接输出回顾正文，不要标题、解释或前后缀\n\n' +
     '年度统计：\n',
+  recall:
+    '你是一位温柔的补记助手。用户某一天没有写日记，但当天和几个"数字灵魂"角色聊了天。请根据这些对话，替用户补记一篇那天的日记：\n' +
+    '要求：\n' +
+    '- 用第一人称（我），像用户本人随手写的口吻：自然、口语化，带一点生活的碎碎念，不要作文腔\n' +
+    '- 内容涵盖：那天聊了什么、用户提到的感受与想法、有意思的细节\n' +
+    '- 120-250 字，段落自然\n' +
+    '- 只写对话里真实出现的内容，不要编造对话之外的事；完全没有对话时正文输出"（那天没有值得记录的对话）"\n' +
+    '- 给出 3-5 个与内容相关的标签（2-4 字，不带 # 号）和一个 2-8 字的简短标题\n' +
+    '- 严格输出 JSON：{"title":"标题","content":"日记正文","tags":["标签1","标签2"]}，不要任何额外文字\n\n' +
+    '那天的对话记录：\n',
+  persona:
+    '你是一位洞察敏锐的灵魂分析师。用户写了很多篇日记，请从这些真实的文字里提炼出 TA 的「数字人格画像」：\n' +
+    '要求：\n' +
+    '- 只基于日记里真实出现的内容，不要凭空推测或编造\n' +
+    '- 提炼 4-6 个性格关键词（2-4 字，如"细腻""倔强""乐观"）\n' +
+    '- 概括 TA 反复出现的话题/在意的事（2-4 条，每条 8-15 字）\n' +
+    '- 总结 TA 的情绪倾向（如"整体平稳，压力大时容易低落"）\n' +
+    '- 给一句温柔的总结（15-30 字，像懂 TA 的朋友说的话）\n' +
+    '- 严格输出 JSON：{"keywords":["关键词1","关键词2"],"topics":["话题1","话题2"],"emotion":"情绪倾向描述","summary":"温柔总结"}，不要任何额外文字\n\n' +
+    '用户的日记（可能较长，请耐心通读）：\n',
+  insight:
+    '你是一位细心的情绪分析师。用户提供了若干天的日记心情记录（心情 1-5：1 很差 / 5 很棒），请找出真实存在的情绪规律：\n' +
+    '要求：\n' +
+    '- 只基于给出的数据总结，不要编造不存在规律；看不出规律就如实说\n' +
+    '- 给出 2-4 条洞察，每条一行，用 "· " 开头，具体（如"周三整体心情偏低""压力大的那几天睡前都会记一笔"）\n' +
+    '- 可以结合日期（星期几）、心情数值、内容长短等找模式\n' +
+    '- 语气像懂你的朋友，不要说教\n' +
+    '- 只输出洞察列表，不要标题、解释或前后缀\n\n' +
+    '日记记录（日期 · 心情 · 字数）：\n',
+  note:
+    '你是用户的一位温柔老朋友。用户很久以前写了一篇日记，现在 TA 翻出来回看。请给这篇旧日记写一句批注（回信）：\n' +
+    '要求：\n' +
+    '- 像老朋友翻到 TA 的旧日记，自然、真诚、带一点岁月的温柔，不要肉麻\n' +
+    '- 可以轻轻回应日记里的情绪、点出当时的可爱或成长，但不要评价说教\n' +
+    '- 30-60 字，一两句话即可\n' +
+    '- 只输出批注本身，不要标题、解释或前后缀\n\n' +
+    '这篇旧日记：\n',
 };
 
 export interface DiaryAssistParams {
   apiKey: string;
-  mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual';
+  mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual' | 'recall' | 'persona' | 'insight' | 'note';
   text: string;
   context?: string;
 }
 
 export async function diaryAssist(
   params: DiaryAssistParams,
-): Promise<{ text?: string; title?: string; tags?: string[]; error?: string }> {
+): Promise<{
+  text?: string;
+  title?: string;
+  tags?: string[];
+  /** persona 模式：数字人格画像 */
+  persona?: { keywords: string[]; topics: string[]; emotion: string; summary: string };
+  error?: string;
+}> {
   const { apiKey, mode, text, context } = params;
   const prompt = PROMPTS[mode];
   if (!prompt) return { error: 'server:error' };
@@ -121,7 +165,7 @@ export async function diaryAssist(
             { role: 'system', content: '你是 VirtuGene 的日记助手，温柔、克制、尊重用户的表达。' },
             { role: 'user', content: userContent },
           ],
-          max_tokens: mode === 'annual' ? 1200 : 800,
+          max_tokens: mode === 'annual' || mode === 'persona' ? 1200 : 800,
           temperature: 0.7,
         }),
       },
@@ -140,8 +184,8 @@ export async function diaryAssist(
     const trimmed = textOut.trim();
     if (!trimmed) return { error: 'server:error' };
 
-    // 草稿类模式（auto/compile/combine）输出 JSON：{title, content, tags}
-    if (mode === 'auto' || mode === 'compile' || mode === 'combine') {
+    // 草稿类模式（auto/compile/combine/recall）输出 JSON：{title, content, tags}
+    if (mode === 'auto' || mode === 'compile' || mode === 'combine' || mode === 'recall') {
       try {
         let t = trimmed;
         if (t.startsWith('```')) t = t.replace(/```json?/i, '').replace(/```/, '').trim();
@@ -158,6 +202,27 @@ export async function diaryAssist(
       } catch {
         // JSON 解析失败 → 退化为纯正文
         return { text: trimmed };
+      }
+    }
+
+    // persona 模式：解析数字人格画像 JSON
+    if (mode === 'persona') {
+      try {
+        let t = trimmed;
+        if (t.startsWith('```')) t = t.replace(/```json?/i, '').replace(/```/, '').trim();
+        const parsed = JSON.parse(t);
+        const strArr = (v: unknown) =>
+          Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim()).slice(0, 8) : [];
+        const persona = {
+          keywords: strArr(parsed.keywords).slice(0, 6),
+          topics: strArr(parsed.topics).slice(0, 4),
+          emotion: typeof parsed.emotion === 'string' ? parsed.emotion.trim() : '',
+          summary: typeof parsed.summary === 'string' ? parsed.summary.trim() : '',
+        };
+        if (persona.keywords.length > 0 && persona.summary) return { persona };
+        return { error: 'server:error' };
+      } catch {
+        return { error: 'server:error' };
       }
     }
 

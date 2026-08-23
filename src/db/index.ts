@@ -124,6 +124,10 @@ export interface Diary {
   weather?: string;
   /** 插图（dataURL 列表，按插入顺序） */
   images?: string[];
+  /** AI 回信/批注（翻旧日记时异步生成，每条日记最多一条） */
+  aiNote?: string;
+  /** 批注生成时间戳 */
+  aiNoteAt?: number;
   /** 软删除时间戳：非空表示在回收站（7 天后自动清除） */
   deletedAt?: number;
   createdAt: number;

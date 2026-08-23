@@ -8,16 +8,19 @@ interface CharacterAddModalProps {
   open: boolean;
   onClose: () => void;
   editCharacter?: Character | null;
+  /** 选中角色并关闭后回调（手机端切回聊天页用） */
+  onSelected?: () => void;
 }
 
 type Tab = 'pool' | 'create';
 
-export function CharacterAddModal({ open, onClose, editCharacter }: CharacterAddModalProps) {
+export function CharacterAddModal({ open, onClose, editCharacter, onSelected }: CharacterAddModalProps) {
   const [tab, setTab] = useState<Tab>(editCharacter ? 'create' : 'pool');
 
   const handleClose = () => {
     setTab('pool');
     onClose();
+    onSelected?.();
   };
 
   return (

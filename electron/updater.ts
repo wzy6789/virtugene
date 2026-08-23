@@ -42,6 +42,8 @@ export function registerUpdater() {
 
   ipcMain.handle('update:check', async () => {
     if (checking) return { checking: true };
+    // 手动检查：清除自动检查的静默标记，保证手动失败的错误一定展示
+    autoSuppress = false;
     checking = true;
     try {
       const result = await autoUpdater.checkForUpdates();

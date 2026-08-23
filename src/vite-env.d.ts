@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** 构建时由 vite.config.ts 注入的 package.json version */
+declare const __APP_VERSION__: string;
+
 type UpdateStatus =
   | { state: 'checking' }
   | { state: 'available'; version: string }
@@ -108,10 +111,10 @@ interface VirtuGeneAPI {
   diary: {
     assist: (params: {
       apiKey: string;
-      mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual';
+      mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual' | 'recall' | 'persona' | 'insight' | 'note';
       text: string;
       context?: string;
-    }) => Promise<{ text?: string; title?: string; tags?: string[]; error?: string }>;
+    }) => Promise<{ text?: string; title?: string; tags?: string[]; persona?: { keywords: string[]; topics: string[]; emotion: string; summary: string }; error?: string }>;
     exportTxt: (entries: { title: string; date: string; content: string }[]) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;
     exportDocx: (entries: { title: string; date: string; content: string }[]) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;
     exportPdf: (html: string) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;

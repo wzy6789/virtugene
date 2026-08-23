@@ -11,7 +11,10 @@ export interface ReplyCheck {
   retryHint?: string;
 }
 
-/** 字符集合重叠度（用于复述检测）：0-1，越接近 1 越相似 */
+/**
+ * 字符集合重叠度（用于复述检测）：0-1，越接近 1 越相似。
+ * 注意：短文本（如"好"vs"好的"）字符集必然高度重叠，因此调用方应对短消息跳过复述检测。
+ */
 function similarity(a: string, b: string): number {
   const norm = (s: string) => new Set(s.replace(/\s+/g, ''));
   const setA = norm(a);
@@ -23,6 +26,9 @@ function similarity(a: string, b: string): number {
   }
   return inter / Math.min(setA.size, setB.size);
 }
+
+/** 复述检测只对足够长的文本启用：短句（如"好""嗯"）字符集必然重叠，会误伤 */
+const MIN_REPEAT_LENGTH = 8;
 
 const GENERIC_PATTERNS: RegExp[] = [
   /^(你好|您好|嗨|哈喽|在吗|当然可以|没问题|好的呢|好呀|嗯嗯|好的好的|很高兴(认识|见到|为你)|有什么可以帮)/,
@@ -53,8 +59,8 @@ export function checkReplyQuality(
     return { ok: false, issue: 'empty', retryHint: RETRY_HINTS.empty };
   }
 
-  // 复述用户消息：整段相似度过高
-  if (userMessage.trim().length > 0 && similarity(text, userMessage) >= 0.85) {
+  // 复述用户消息：整段相似度过高（仅长文本判定，短句字符集必然重叠会误伤）
+  if (userMessage.trim().length >= MIN_REPEAT_LENGTH && similarity(text, userMessage) >= 0.85) {
     return { ok: false, issue: 'repeat-user', retryHint: RETRY_HINTS['repeat-user'] };
   }
 
@@ -65,8 +71,8 @@ export function checkReplyQuality(
     }
   }
 
-  // 重复自己刚说的话
-  if (lastAssistantContent && lastAssistantContent.trim().length > 0 && similarity(text, lastAssistantContent) >= 0.9) {
+  // 重复自己刚说的话（仅长文本判定）
+  if (lastAssistantContent && lastAssistantContent.trim().length >= MIN_REPEAT_LENGTH && similarity(text, lastAssistantContent) >= 0.9) {
     return { ok: false, issue: 'repeat-own', retryHint: RETRY_HINTS['repeat-own'] };
   }
 

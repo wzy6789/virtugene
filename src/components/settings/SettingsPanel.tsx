@@ -9,6 +9,8 @@ import { userRepo } from '../../db/user-repo';
 import { encryptApiKey, verifyPassword } from '../../lib/crypto';
 import { ipc } from '../../lib/ipc-client';
 import { resetDiaryUnlock } from '../../lib/diary-unlock';
+import { SyncSection } from './SyncSection';
+import { IS_ELECTRON, IS_MOBILE } from '../../lib/platform';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -212,9 +214,13 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             </div>
           </div>
 
-          {/* App update */}
-          <div>
-            <h3 className="text-sm font-medium text-ink mb-3">基因序列更新</h3>
+          {/* 局域网同步：手机端作为客户端直连桌面端同步服务 */}
+          {IS_MOBILE && <SyncSection />}
+
+          {/* App update（仅桌面端支持自动更新） */}
+          {IS_ELECTRON && (
+            <div>
+              <h3 className="text-sm font-medium text-ink mb-3">基因序列更新</h3>
             <div className="p-4 rounded-xl bg-surface border border-line space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400">当前版本</span>
@@ -255,7 +261,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 {updateChecking ? '检查中...' : '检查更新'}
               </button>
             </div>
-          </div>
+            </div>
+          )}
 
           {/* Danger zone */}
           <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10">

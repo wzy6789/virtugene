@@ -104,7 +104,7 @@ export const diaryRepo = {
    * 导入恢复：按「日期去重」策略写入——用户已有该日期的日记则跳过，否则新建。
    * 返回 { imported, skipped }。
    */
-  async importBackup(userId: string, items: { date: string; title?: string; content?: string; mood?: number; tags?: string[]; weather?: string; characterId?: string; images?: string[] }[]): Promise<{ imported: number; skipped: number }> {
+  async importBackup(userId: string, items: { date: string; title?: string; content?: string; mood?: number; tags?: string[]; weather?: string; characterId?: string; images?: string[]; aiNote?: string; aiNoteAt?: number }[]): Promise<{ imported: number; skipped: number }> {
     let imported = 0;
     let skipped = 0;
     for (const it of items) {
@@ -120,11 +120,13 @@ export const diaryRepo = {
         tags: it.tags ?? [],
         characterId: it.characterId,
       }).then(async (id) => {
-        if (it.images && it.images.length > 0) {
-          await this.update(id, { images: it.images });
-        }
-        if (it.weather) {
-          await this.update(id, { weather: it.weather });
+        const extra: Partial<Diary> = {};
+        if (it.images && it.images.length > 0) extra.images = it.images;
+        if (it.weather) extra.weather = it.weather;
+        if (it.aiNote) extra.aiNote = it.aiNote;
+        if (it.aiNoteAt) extra.aiNoteAt = it.aiNoteAt;
+        if (Object.keys(extra).length > 0) {
+          await this.update(id, extra);
         }
       });
       imported++;
@@ -165,11 +167,14 @@ export const diaryRepo = {
       const mood = Math.round(sorted.reduce((s, d) => s + (d.mood ?? 3), 0) / sorted.length);
       const title = first.title || sorted.map((d) => d.title).find((t) => t && t.trim()) || '';
       const images = [...new Set(sorted.flatMap((d) => d.images ?? []))];
-      await this.update(first.id, { content, tags, mood, title, images });
+      // 合并时保留 AI 批注（取任意一条非空批注）
+      const aiNote = sorted.find((d) => d.aiNote)?.aiNote;
+      const aiNoteAt = sorted.find((d) => d.aiNoteAt)?.aiNoteAt;
+      await this.update(first.id, { content, tags, mood, title, images, ...(aiNote ? { aiNote, ...(aiNoteAt ? { aiNoteAt } : {}) } : {}) });
       for (const d of sorted.slice(1)) {
         await this.deleteById(d.id);
       }
-      out.push({ ...first, content, tags, mood, title, images });
+      out.push({ ...first, content, tags, mood, title, images, ...(aiNote ? { aiNote, ...(aiNoteAt ? { aiNoteAt } : {}) } : {}) });
     }
     return out;
   },

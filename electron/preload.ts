@@ -80,7 +80,7 @@ contextBridge.exposeInMainWorld('virtugene', {
   diary: {
     assist: (params: {
       apiKey: string;
-      mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual';
+      mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual' | 'recall' | 'persona' | 'insight' | 'note';
       text: string;
       context?: string;
     }) => ipcRenderer.invoke('diary:assist', params),

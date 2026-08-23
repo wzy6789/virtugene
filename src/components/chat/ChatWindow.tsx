@@ -506,7 +506,9 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       <div key={currentSessionId} ref={scrollRef} className="animate-message-in flex-1 overflow-y-auto px-4 py-3" onClick={() => inputRef.current?.focus()}>
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <p className="text-xs text-gray-600">聊点什么吧</p>
+            <p className="text-xs text-gray-600">
+              {character ? '聊点什么吧' : '去「角色」页选一个角色，开始对话吧'}
+            </p>
           </div>
         ) : (
           <>

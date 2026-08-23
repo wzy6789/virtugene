@@ -10,6 +10,7 @@ import { useCharacterStateStore } from './character-state-store';
 import { deriveProactivity, GREETING_PROACTIVITY_THRESHOLD } from '../lib/personality';
 import { ipc } from '../lib/ipc-client';
 import { useNotificationStore } from './notification-store';
+import { useDiaryStore } from './diary-store';
 
 interface CharPreview {
   content: string;
@@ -226,11 +227,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isProactive: true,
     };
     await messageRepo.create(msg);
-    await sessionRepo.incrementUnread(session.id);
     await sessionRepo.touch(session.id);
 
     const { selectedCharacterId, unreadByCharacter } = get();
-    // If this character is currently selected, add to message list
+    // If this character is currently selected, add to message list (不计数未读)
     if (selectedCharacterId === characterId) {
       set((s) => ({
         messages: [...s.messages, msg],
@@ -240,6 +240,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }));
     } else {
+      // 不在当前会话才增加未读数
+      await sessionRepo.incrementUnread(session.id);
       // Just update preview and unread count
       const count = (unreadByCharacter[characterId] ?? 0) + 1;
       set({
@@ -461,6 +463,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
     await db.characters.where('createdBy').equals(userId).delete();
+    // 注销账号一并删除该用户的日记（含回收站）
+    await db.diaries.where('userId').equals(userId).delete();
     await db.users.delete(userId);
 
     set({
@@ -472,6 +476,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       unreadByCharacter: {},
       hasMoreMessages: false,
     });
+    // 手账内存态一并清空
+    useDiaryStore.getState().reset();
   },
 
   /** 把日记文本作为用户消息发给指定角色：先切到 TA 的会话，再标记待发送 */

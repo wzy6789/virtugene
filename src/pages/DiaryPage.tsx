@@ -12,6 +12,10 @@ import { DiaryView } from '../components/diary/DiaryView';
 import { AutoGenModal } from '../components/diary/AutoGenModal';
 import { ReviewModal } from '../components/diary/ReviewModal';
 import { YearReviewModal } from '../components/diary/YearReviewModal';
+import { RecallModal } from '../components/diary/RecallModal';
+import { PersonaModal } from '../components/diary/PersonaModal';
+import { YearTableModal } from '../components/diary/YearTableModal';
+import { InsightModal } from '../components/diary/InsightModal';
 import { DiaryLockScreen, PinSettingsModal } from '../components/diary/DiaryLock';
 import { sha256 } from '../store/settings-store';
 import { FilterSelect } from '../components/ui/FilterSelect';
@@ -65,6 +69,11 @@ export function DiaryPage() {
   const [reminderModal, setReminderModal] = useState(false);
   /** 「更多」菜单 */
   const [moreOpen, setMoreOpen] = useState(false);
+  /** 补记助手 / 人格画像 / 人生年表 */
+  const [showRecall, setShowRecall] = useState(false);
+  const [showPersona, setShowPersona] = useState(false);
+  const [showYearTable, setShowYearTable] = useState(false);
+  const [showInsight, setShowInsight] = useState(false);
 
   const setUnlocked = (v: boolean) => {
     setDiaryUnlockState(v);
@@ -126,6 +135,16 @@ export function DiaryPage() {
       data.push(byDate.has(key) ? byDate.get(key)! : null);
     }
     return { data, dates };
+  }, [diaries]);
+
+  /** 每日一忆：历史中「同月同日」的日记（不含今年今天），取最近一篇 */
+  const memoryOfToday = useMemo(() => {
+    const now = new Date();
+    const md = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const thisYear = String(now.getFullYear());
+    return diaries
+      .filter((d) => d.date.endsWith(md) && !d.date.startsWith(thisYear) && d.content.trim().length > 0)
+      .sort((a, b) => b.date.localeCompare(a.date))[0];
   }, [diaries]);
 
   const openNew = () => {
@@ -217,8 +236,8 @@ export function DiaryPage() {
       if (r.canceled) return;
       if (!r.ok || !Array.isArray(r.diaries)) { setExportMsg('导入失败：文件格式不对'); return; }
       const userId = useAuthStore.getState().userId ?? '';
-      const items = (r.diaries as { date?: string; title?: string; content?: string; mood?: number; tags?: string[]; weather?: string; characterId?: string; images?: string[] }[])
-        .filter((d): d is { date: string; title?: string; content?: string; mood?: number; tags?: string[]; weather?: string; characterId?: string; images?: string[] } => !!d && typeof d.date === 'string');
+      const items = (r.diaries as { date?: string; title?: string; content?: string; mood?: number; tags?: string[]; weather?: string; characterId?: string; images?: string[]; aiNote?: string; aiNoteAt?: number }[])
+        .filter((d): d is { date: string; title?: string; content?: string; mood?: number; tags?: string[]; weather?: string; characterId?: string; images?: string[]; aiNote?: string; aiNoteAt?: number } => !!d && typeof d.date === 'string');
       const { imported, skipped } = await diaryRepo.importBackup(userId, items);
       await load();
       setExportMsg(`导入完成：新增 ${imported} 篇，跳过已存在 ${skipped} 篇`);
@@ -333,6 +352,30 @@ export function DiaryPage() {
                 >
                   🎇 年度回顾
                 </button>
+                <button
+                  onClick={() => { setShowRecall(true); setMoreOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
+                >
+                  🧠 补记助手
+                </button>
+                <button
+                  onClick={() => { setShowPersona(true); setMoreOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
+                >
+                  🧬 数字人格画像
+                </button>
+                <button
+                  onClick={() => { setShowYearTable(true); setMoreOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
+                >
+                  📜 人生年表
+                </button>
+                <button
+                  onClick={() => { setShowInsight(true); setMoreOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sub hover:bg-surface transition-colors"
+                >
+                  📊 情绪周期洞察
+                </button>
                 <div className="my-1 mx-3 h-px bg-line" />
                 <button
                   onClick={() => { setDiaryAiEnabled(!diaryAiEnabled); }}
@@ -434,6 +477,23 @@ export function DiaryPage() {
             <MoodTrendLine data={moodTrend.data} dates={moodTrend.dates} />
           </div>
 
+          {/* 每日一忆：过去的今天 */}
+          {memoryOfToday && (
+            <button
+              onClick={() => openEdit(memoryOfToday)}
+              className="w-full text-left rounded-xl border border-dashed border-life-cyan/40 bg-life-cyan/5 px-4 py-3 hover:bg-life-cyan/10 hover:border-life-cyan/60 transition-all group"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm">🕰️</span>
+                <span className="text-xs font-medium text-life-cyan">每日一忆 · 过去的今天</span>
+                <span className="text-[10px] text-gray-400 ml-auto group-hover:text-life-cyan transition-colors">重温 →</span>
+              </div>
+              <p className="text-sm text-sub line-clamp-2 whitespace-pre-wrap">
+                {memoryOfToday.title ? `《${memoryOfToday.title}》` : ''} {memoryOfToday.date.slice(0, 4)} 年的今天你写道：{memoryOfToday.content.slice(0, 80)}
+              </p>
+            </button>
+          )}
+
           {/* 工具栏 */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-1 min-w-[200px] px-3 py-1.5 rounded-lg bg-surface border border-transparent focus-within:border-gene-purple/40 focus-within:shadow-[0_0_0_3px_rgba(108,92,231,0.10)] transition-all">
@@ -529,7 +589,12 @@ export function DiaryPage() {
                         写一篇 →
                       </button>
                     ) : selectedDate < todayStr() ? (
-                      <p className="text-xs text-gray-600">已归档，不可补写</p>
+                      <button
+                        onClick={() => setWritingDate(selectedDate)}
+                        className="text-xs text-life-cyan hover:underline"
+                      >
+                        补写一篇 →
+                      </button>
                     ) : (
                       <p className="text-xs text-gray-600">还没到这一天</p>
                     )}
@@ -618,6 +683,10 @@ export function DiaryPage() {
       <AutoGenModal open={showAutoGen} onClose={() => setShowAutoGen(false)} />
       <ReviewModal open={showReview} onClose={() => setShowReview(false)} />
       <YearReviewModal open={showYearReview} onClose={() => setShowYearReview(false)} />
+      <RecallModal open={showRecall} onClose={() => setShowRecall(false)} />
+      <PersonaModal open={showPersona} onClose={() => setShowPersona(false)} />
+      <YearTableModal open={showYearTable} onClose={() => setShowYearTable(false)} />
+      <InsightModal open={showInsight} onClose={() => setShowInsight(false)} />
 
       {/* PIN 设置/修改弹窗 */}
       <PinSettingsModal

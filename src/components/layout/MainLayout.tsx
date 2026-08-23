@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { TitleBar } from './TitleBar';
 import { Sidebar } from './Sidebar';
+import { MobileLayout } from './MobileLayout';
 import { UpdateBanner } from './UpdateBanner';
 import { NotificationCloud } from '../chat/NotificationCloud';
 import { useUpdateStore } from '../../store/update-store';
+import { IS_MOBILE } from '../../lib/platform';
 
 interface Props {
   children: React.ReactNode;
@@ -14,6 +16,11 @@ export function MainLayout({ children }: Props) {
     const off = useUpdateStore.getState().init();
     return off;
   }, []);
+
+  // 手机端（Capacitor / 手机浏览器）：微信式底部四栏导航，页面由 MobileLayout 自管
+  if (IS_MOBILE) {
+    return <MobileLayout />;
+  }
 
   return (
     <div className="relative h-full w-full flex flex-col bg-app overflow-hidden">

@@ -38,7 +38,9 @@ export function DiaryChatPage({ date, onBack }: Props) {
   const [showDelete, setShowDelete] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'write' | 'diary'>('write');
+  /** 当天 → 默认写作视图；归档日 → 默认正式日记视图（补写需主动点「💬 补写」） */
+  const isPastInitial = date < todayStr();
+  const [viewMode, setViewMode] = useState<'write' | 'diary'>(isPastInitial ? 'diary' : 'write');
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
   const [showNewHint, setShowNewHint] = useState(false);
@@ -62,12 +64,40 @@ export function DiaryChatPage({ date, onBack }: Props) {
     const d = await getOrCreateForDate(date);
     diaryRef.current = d;
     setDiary(d);
-    // 自动标题：第一篇段落前 24 字
-    if (d && !d.title.trim() && d.content.trim()) {
+    // 自动标题：仅当天（写作中的今天）第一篇段落前 24 字；
+    // 归档日只读，绝不改动其标题（用户可能故意留空）
+    if (d && date >= todayStr() && !d.title.trim() && d.content.trim()) {
       const t = d.content.trim().split('\n')[0].slice(0, 24);
       if (t) await updateDiary(d.id, { title: t });
     }
-  }, [date, getOrCreateForDate, updateDiary]);
+    // AI 回信：翻旧日记（≥7 天）且还没有批注、且未尝试失败过 → 后台生成一条
+    // aiNoteAt: 正数=生成时间；负数=上次生成失败（避免反复重试）；undefined=未尝试
+    const noteAttempted = d && d.aiNoteAt != null;
+    if (d && date < todayStr() && !d.aiNote && !noteAttempted && d.content.trim().length >= 20 && apiKey) {
+      const ageDays = Math.floor((Date.now() - new Date(`${date}T00:00:00`).getTime()) / 86400000);
+      if (ageDays >= 7) {
+        try {
+          const r = await ipc.diary.assist({ apiKey, mode: 'note', text: d.content.slice(0, 800) });
+          if (r.text && !r.error) {
+            await updateDiary(d.id, { aiNote: r.text, aiNoteAt: Date.now() });
+            if (diaryRef.current?.id === d.id) {
+              diaryRef.current = { ...diaryRef.current, aiNote: r.text, aiNoteAt: Date.now() };
+              setDiary({ ...diaryRef.current });
+            }
+          } else {
+            // 生成失败：记一个失败时间戳，避免每次打开都重复请求
+            await updateDiary(d.id, { aiNoteAt: -Date.now() });
+            if (diaryRef.current?.id === d.id) {
+              diaryRef.current = { ...diaryRef.current, aiNoteAt: -Date.now() };
+              setDiary({ ...diaryRef.current });
+            }
+          }
+        } catch {
+          /* 批注失败不影响查看 */
+        }
+      }
+    }
+  }, [date, getOrCreateForDate, updateDiary, apiKey]);
 
   useEffect(() => {
     void load();
@@ -135,8 +165,12 @@ export function DiaryChatPage({ date, onBack }: Props) {
     setEditingIdx(null);
     setEditingText('');
     const newContent = cur.content.trim() ? cur.content.trim() + '\n\n' + text : text;
-    const newTitle = cur.title.trim() ? cur.title : text.slice(0, 24);
-    patch({ content: newContent, title: newTitle });
+    // 标题：归档日补写只追加，绝不动标题；当天无标题时用首段前 24 字自动补
+    const patchPayload: Partial<Diary> = { content: newContent };
+    if (!isPast) {
+      patchPayload.title = cur.title.trim() ? cur.title : text.slice(0, 24);
+    }
+    patch(patchPayload);
 
     // AI 灵魂引导（可开关，不写入正文；不阻塞正文发送——引导进行中跳过本次引导，避免并发乱序）
     if (diaryAiEnabled && apiKey && !busy) {
@@ -160,7 +194,9 @@ export function DiaryChatPage({ date, onBack }: Props) {
     if (!cur) return;
     setEditingIdx(null);
     setEditingText('');
-    if (replace) {
+    // 归档日只允许追加：即使 AI 建议"替换"也强制转为追加，绝不覆盖已有内容
+    const effectiveReplace = replace && !isPast;
+    if (effectiveReplace) {
       // 生成包含日记片段 → 直接替换为一段完整文章（不再保留对话式分段）
       patch({ content: text.trim(), tags: tags ?? cur.tags, ...(title ? { title } : {}) });
     } else {
@@ -168,7 +204,8 @@ export function DiaryChatPage({ date, onBack }: Props) {
       patch({
         content: cur.content.trim() ? cur.content.trim() + '\n\n' + text.trim() : text.trim(),
         tags: mergedTags,
-        ...((!cur.title.trim() && title) ? { title } : {}),
+        // 归档日不补标题；当天无标题时才允许 AI 建议标题
+        ...((!isPast && !cur.title.trim() && title) ? { title } : {}),
       });
     }
     setExtractOpen(false);
@@ -221,7 +258,37 @@ export function DiaryChatPage({ date, onBack }: Props) {
     useUIStore.getState().setActiveView('chat');
   };
 
-  /** 插图：选择本地图片 → dataURL 存入 diary.images */
+  /** 插图压缩：dataURL → canvas 缩放（最大边 1280）+ JPEG 0.82，减少 IndexedDB 占用；失败则保留原图 */
+  const compressImage = (dataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const MAX_EDGE = 1280;
+            const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+            const w = Math.max(1, Math.round(img.width * scale));
+            const h = Math.max(1, Math.round(img.height * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(dataUrl); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          } catch {
+            resolve(dataUrl);
+          }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      } catch {
+        resolve(dataUrl);
+      }
+    });
+  };
+
+  /** 插图：选择本地图片 → 压缩 → dataURL 存入 diary.images */
   const pickImages = async (files: FileList | null) => {
     const cur = diaryRef.current;
     if (!cur || !files) return;
@@ -235,8 +302,10 @@ export function DiaryChatPage({ date, onBack }: Props) {
         reader.readAsDataURL(f);
       });
     const results = await Promise.all(list.map(read));
-    const urls = results.filter((u): u is string => !!u);
-    if (urls.length === 0) return;
+    const raw = results.filter((u): u is string => !!u);
+    if (raw.length === 0) return;
+    // 并行压缩，全部完成后再一次性写入（避免逐张 patch 触发多次保存）
+    const urls = await Promise.all(raw.map(compressImage));
     const next = [...(cur.images ?? []), ...urls].slice(0, 12);
     patch({ images: next });
     if (fileRef.current) fileRef.current.value = '';
@@ -298,7 +367,15 @@ export function DiaryChatPage({ date, onBack }: Props) {
               ‹ 返回手账
             </button>
             <span className="text-sm font-semibold text-ink">{formatDateFull(date)}</span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-500">已归档 · 不可修改</span>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-500">已归档 · 可补写</span>
+
+            {/* 写作 / 日记视图切换（归档日只允许追加，已有段落不可改） */}
+            <button
+              onClick={() => setViewMode(viewMode === 'write' ? 'diary' : 'write')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs transition-all border border-line-strong text-sub hover:text-ink"
+            >
+              {viewMode === 'write' ? '📄 日记视图' : '💬 补写'}
+            </button>
           </>
         ) : (
           <>
@@ -375,8 +452,8 @@ export function DiaryChatPage({ date, onBack }: Props) {
         </button>
       </div>
 
-      {/* 写作模式：聊天气泡（仅当天可写） */}
-      {viewMode === 'write' && !isPast ? (
+      {/* 写作模式：聊天气泡（当天可写；归档日只允许追加，已有段落不可改） */}
+      {viewMode === 'write' ? (
       <>
       {/* 消息区 */}
       <div
@@ -646,7 +723,7 @@ export function DiaryChatPage({ date, onBack }: Props) {
       </div>
       </>
       ) : (
-        /* 日记视图：正式日记格式（归档日只读） */
+        /* 日记视图：正式日记格式 */
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <DiaryView diary={diary} />
           <div className="max-w-2xl mx-auto mt-6 flex items-center justify-between">
@@ -654,13 +731,22 @@ export function DiaryChatPage({ date, onBack }: Props) {
               ‹ 手账
             </button>
             {isPast ? (
-              <p className="text-xs text-gray-500">📁 这一天已归档为正式日记，不可修改</p>
+              <p className="text-xs text-gray-500">📁 这一天已归档，可点击「💬 补写」追加新段落（已有内容不可改）</p>
             ) : (
               <button
                 onClick={() => setViewMode('write')}
                 className="px-5 py-2.5 rounded-xl bg-gene-purple hover:bg-[#5B4BD4] text-sm font-medium text-white shadow-[0_2px_12px_rgba(108,92,231,0.35)] transition-all"
               >
                 ✏️ 继续写
+              </button>
+            )}
+            {/* 补写入口（归档日） */}
+            {isPast && (
+              <button
+                onClick={() => setViewMode('write')}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gene-purple bg-gene-purple/10 hover:bg-gene-purple/20 transition-colors"
+              >
+                💬 补写
               </button>
             )}
             {/* 发给角色（聊天主界面：让 TA 看看你的一天） */}
@@ -731,6 +817,7 @@ export function DiaryChatPage({ date, onBack }: Props) {
         characterId={diary.characterId}
         characterName={linkedChar?.name}
         diaryContent={diary.content}
+        appendOnly={isPast}
         onInsert={insertExtract}
       />
 

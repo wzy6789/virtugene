@@ -34,6 +34,8 @@ interface DiaryState {
   restoreDiary: (id: string) => Promise<void>;
   /** 回收站内彻底删除 */
   purgeDiary: (id: string) => Promise<void>;
+  /** 登出/切换账号时清空内存数据，避免下个账号看到上一个账号的日记闪烁 */
+  reset: () => void;
   setView: (view: DiaryView) => void;
   setSearch: (s: string) => void;
   setMoodFilter: (m: number | null) => void;
@@ -156,4 +158,5 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
   setYearFilter: (yearFilter) => set({ yearFilter }),
   setTagFilter: (tagFilter) => set({ tagFilter }),
   clearFilters: () => set({ search: '', moodFilter: null, yearFilter: null, tagFilter: null }),
+  reset: () => set({ diaries: [], trash: [], loaded: false, search: '', moodFilter: null, yearFilter: null, tagFilter: null }),
 }));

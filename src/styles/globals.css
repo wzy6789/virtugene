@@ -41,6 +41,21 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* 页面底色跟随主题；html 兜底深色（状态栏/刘海区域、加载期），避免白屏/白条 */
+html {
+  background: #0F0F1A;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 手机端安全区通用工具类 */
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
 /* Glass card base */
 .glass-card {
   background: var(--bg-glass);

@@ -76,6 +76,17 @@ export function DiaryView({ diary }: Props) {
             ))}
           </div>
         )}
+
+        {/* AI 回信批注：翻旧日记时，老朋友留下的悄悄话 */}
+        {diary.aiNote && (
+          <div className="mt-5 rounded-xl border border-life-cyan/25 bg-life-cyan/5 px-4 py-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-sm">💌</span>
+              <span className="text-[11px] tracking-[0.15em] text-life-cyan uppercase">来自时光的批注</span>
+            </div>
+            <p className="text-sm text-sub leading-relaxed">{diary.aiNote}</p>
+          </div>
+        )}
       </div>
     </div>
   );

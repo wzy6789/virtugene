@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.2',
+    date: '2026-08-23',
+    notes: [
+      '手账创新：归档日补写（只追加）、补记助手（按当天聊天生成草稿）',
+      '数字人格画像（DNA 基因图谱）、情绪周期洞察、AI 回信批注',
+      '每日一忆「过去的今天」、人生年表（按月时间轴）',
+      '修复：短消息误判复述、主动消息未读数、归档日补写改标题、注销不删日记等一批问题',
+    ],
+  },
+  {
     version: '2.0.1',
     date: '2026-08-20',
     notes: [

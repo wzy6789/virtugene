@@ -1,6 +1,15 @@
 import { db, type Session } from './index';
 
 export const sessionRepo = {
+  /** 该用户全部会话（补记助手等场景需要跨角色收集某天的对话） */
+  async getByUser(userId: string): Promise<Session[]> {
+    return db.sessions
+      .where('userId')
+      .equals(userId)
+      .toArray()
+      .then((arr) => arr.sort((a, b) => b.updatedAt - a.updatedAt));
+  },
+
   async getByCharacter(characterId: string, userId: string): Promise<Session[]> {
     const sessions = await db.sessions
       .where('[characterId+userId]')
