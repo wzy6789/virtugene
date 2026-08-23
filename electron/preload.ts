@@ -77,6 +77,23 @@ contextBridge.exposeInMainWorld('virtugene', {
       history: { role: string; content: string }[];
     }) => ipcRenderer.invoke('context:summarize', params),
   },
+  diary: {
+    assist: (params: {
+      apiKey: string;
+      mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual';
+      text: string;
+      context?: string;
+    }) => ipcRenderer.invoke('diary:assist', params),
+    exportTxt: (entries: { title: string; date: string; content: string }[]) =>
+      ipcRenderer.invoke('diary:exportTxt', { entries }),
+    exportDocx: (entries: { title: string; date: string; content: string }[]) =>
+      ipcRenderer.invoke('diary:exportDocx', { entries }),
+    exportPdf: (html: string) => ipcRenderer.invoke('diary:exportPdf', { html }),
+    exportJson: (diaries: unknown[]) => ipcRenderer.invoke('diary:exportJson', { diaries }),
+    importJson: () => ipcRenderer.invoke('diary:importJson'),
+    exportMarkdown: (diaries: { date: string; title: string; content: string; mood?: number; tags?: string[] }[]) =>
+      ipcRenderer.invoke('diary:exportMarkdown', { diaries }),
+  },
   update: {
     check: () => ipcRenderer.invoke('update:check'),
     download: () => ipcRenderer.invoke('update:download'),
@@ -98,6 +115,7 @@ contextBridge.exposeInMainWorld('virtugene', {
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
+    notify: (title: string, body: string) => ipcRenderer.invoke('app:notify', { title, body }),
   },
   clipboard: {
     writeText: (text: string) => ipcRenderer.invoke('clipboard:writeText', { text }),

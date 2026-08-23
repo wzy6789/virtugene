@@ -25,7 +25,7 @@ export function NotificationCloud() {
   if (items.length === 0) return null;
 
   return (
-    <div className="absolute top-12 left-1/2 -translate-x-1/2 z-[70] w-full max-w-md px-4 flex flex-col items-center gap-2.5 pointer-events-none">
+    <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[70] w-full max-w-md px-4 flex flex-col items-center gap-2.5 pointer-events-none">
       {items.map((item, idx) => (
         <button
           key={item.id}

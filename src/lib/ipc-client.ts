@@ -26,6 +26,15 @@ const noop: VirtuGeneAPI = {
     settle: async () => ({ error: '未在 Electron 环境中运行' }),
     summarize: async () => ({ error: '未在 Electron 环境中运行' }),
   },
+  diary: {
+    assist: async () => ({ error: '未在 Electron 环境中运行' }),
+    exportTxt: async () => ({ ok: false }),
+    exportDocx: async () => ({ ok: false }),
+    exportPdf: async () => ({ ok: false }),
+    exportJson: async () => ({ ok: false }),
+    importJson: async () => ({ ok: false }),
+    exportMarkdown: async () => ({ ok: false }),
+  },
   shell: {
     open: async () => false,
   },
@@ -37,6 +46,7 @@ const noop: VirtuGeneAPI = {
   },
   app: {
     getVersion: async () => '',
+    notify: async () => false,
   },
   clipboard: {
     writeText: async () => false,

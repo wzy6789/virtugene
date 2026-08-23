@@ -108,6 +108,28 @@ export interface EmotionSnapshot {
   createdAt: number;
 }
 
+export interface Diary {
+  id: string;
+  userId: string;
+  /** 归属日期 YYYY-MM-DD（本地时区） */
+  date: string;
+  title: string;
+  content: string;
+  /** 心情 1-5：1=很差 2=低落 3=一般 4=开心 5=很棒 */
+  mood: number;
+  tags: string[];
+  /** 关联角色（可选，仅引用展示） */
+  characterId?: string;
+  /** 天气（正式日记格式用，如 ☀️ ⛅ ☁️ 🌧️ ❄️） */
+  weather?: string;
+  /** 插图（dataURL 列表，按插入顺序） */
+  images?: string[];
+  /** 软删除时间戳：非空表示在回收站（7 天后自动清除） */
+  deletedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export class VirtuGeneDB extends Dexie {
   users!: Table<User, string>;
   characters!: Table<Character, string>;
@@ -116,6 +138,7 @@ export class VirtuGeneDB extends Dexie {
   memories!: Table<MemoryItem, string>;
   emotionSnapshots!: Table<EmotionSnapshot, string>;
   characterStates!: Table<CharacterState, [string, string]>;
+  diaries!: Table<Diary, string>;
 
   constructor() {
     super('virtugene');
@@ -246,6 +269,17 @@ export class VirtuGeneDB extends Dexie {
       memories: 'id,characterId,userId,createdAt',
       emotionSnapshots: 'id,sessionId,characterId,createdAt',
       characterStates: '[characterId+userId]',
+    });
+    // v13: 日记（用户日记，本地存储）
+    this.version(13).stores({
+      users: 'id,username',
+      characters: 'id,isPreset,published,createdBy',
+      sessions: 'id,characterId,userId,[characterId+userId],updatedAt',
+      messages: 'id,sessionId,[sessionId+createdAt]',
+      memories: 'id,characterId,userId,createdAt',
+      emotionSnapshots: 'id,sessionId,characterId,createdAt',
+      characterStates: '[characterId+userId]',
+      diaries: 'id,userId,date,[userId+date]',
     });
   }
 }

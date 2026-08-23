@@ -1,8 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useEmotionStore } from '../../store/emotion-store';
 import { useChatStore } from '../../store/chat-store';
 import { useCharacterStateStore } from '../../store/character-state-store';
+import { useAuthStore } from '../../store/auth-store';
 import { useRipple } from '../../lib/ripple';
+import { diaryRepo } from '../../db/diary-repo';
+import { moodEmoji as diaryMoodEmoji, moodColor as diaryMoodColor } from '../../lib/diary-utils';
 import { EmotionChart } from './EmotionChart';
 import { EmotionCurve } from './EmotionCurve';
 import { getRelationLevel, levelProgress } from '../../lib/affinity';
@@ -83,6 +86,24 @@ export function EmotionPanel() {
   const affinity = useCharacterStateStore((s) => s.affinity);
   const mood = useCharacterStateStore((s) => s.mood);
   const milestones = useCharacterStateStore((s) => s.milestones);
+  const userId = useAuthStore((s) => s.userId) ?? '';
+
+  /** 我的心情（来自日记，最近 7 天） */
+  const [myMoods, setMyMoods] = useState<{ date: string; mood: number }[]>([]);
+
+  useEffect(() => {
+    if (!isPanelOpen || !userId) return;
+    let alive = true;
+    diaryRepo
+      .getByUser(userId)
+      .then((diaries) => {
+        if (!alive) return;
+        const sorted = [...diaries].sort((a, b) => a.date.localeCompare(b.date));
+        setMyMoods(sorted.slice(-7).map((d) => ({ date: d.date, mood: d.mood ?? 3 })));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isPanelOpen, userId]);
 
   const { width, startDrag } = useResizable({
     initial: PANEL_DEFAULT,
@@ -232,6 +253,35 @@ export function EmotionPanel() {
               </div>
             </div>
           </div>
+
+          {/* 我的心情（日记联动） */}
+          {myMoods.length > 0 && (
+            <div className="rounded-xl bg-surface border border-line p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">我的心情（日记）</span>
+                <span className="text-sm">{diaryMoodEmoji(myMoods[myMoods.length - 1].mood)}</span>
+              </div>
+              <div className="flex items-end gap-1.5 h-9">
+                {myMoods.map((m) => (
+                  <div
+                    key={m.date}
+                    className="flex-1 rounded-t transition-all hover:opacity-100"
+                    style={{
+                      height: `${(m.mood / 5) * 100}%`,
+                      backgroundColor: diaryMoodColor(m.mood),
+                      opacity: 0.75,
+                      boxShadow: `0 0 6px ${diaryMoodColor(m.mood)}66`,
+                    }}
+                    title={`${m.date} · ${['很差', '低落', '一般', '开心', '很棒'][m.mood - 1] ?? ''}`}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between mt-1 text-[9px] text-gray-400">
+                <span>较早</span>
+                <span>最近</span>
+              </div>
+            </div>
+          )}
 
           {/* Analyze button */}
           <button

@@ -25,6 +25,8 @@ interface ChatState {
   unreadByCharacter: Record<string, number>;
   /** 当前会话是否还有更早的消息未加载（分页） */
   hasMoreMessages: boolean;
+  /** 「把日记发给角色」：切到目标会话后，待发送的日记文本（由 ChatWindow 消费并触发 AI 回复） */
+  pendingDiarySend: { sessionId: string; text: string } | null;
 
   loadCharacters: () => Promise<void>;
   selectCharacter: (id: string) => Promise<void>;
@@ -42,6 +44,10 @@ interface ChatState {
   togglePin: (id: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   triggerProactive: () => Promise<void>;
+  /** 把一段文本（如日记）作为用户消息发给指定角色，切到该会话并等待 ChatWindow 触发 AI 回复 */
+  shareDiaryToCharacter: (characterId: string, text: string) => Promise<void>;
+  /** ChatWindow 消费掉待发送的日记文本 */
+  consumeDiarySend: () => void;
   reset: () => void;
 }
 
@@ -115,6 +121,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   charPreviews: {},
   unreadByCharacter: {},
   hasMoreMessages: false,
+  pendingDiarySend: null,
 
   loadCharacters: async () => {
     const userId = useAuthStore.getState().userId ?? '';
@@ -467,6 +474,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  /** 把日记文本作为用户消息发给指定角色：先切到 TA 的会话，再标记待发送 */
+  shareDiaryToCharacter: async (characterId, text) => {
+    const userId = useAuthStore.getState().userId ?? '';
+    await get().selectCharacter(characterId);
+    const sessionId = get().currentSessionId;
+    if (!sessionId) return;
+    // 直接把日记作为用户消息落库（ChatWindow 会立即触发 AI 回复）
+    const msg: Message = {
+      id: crypto.randomUUID(),
+      sessionId,
+      role: 'user',
+      content: text,
+      createdAt: Date.now(),
+      isProactive: false,
+    };
+    await messageRepo.create(msg);
+    await sessionRepo.touch(sessionId);
+    // 追加到当前消息列表
+    set((s) => ({
+      messages: [...s.messages, msg],
+      charPreviews: {
+        ...s.charPreviews,
+        [characterId]: { content: text, createdAt: msg.createdAt },
+      },
+      // 标记待发送：ChatWindow 消费后触发 AI 回复
+      pendingDiarySend: { sessionId, text },
+    }));
+  },
+
+  consumeDiarySend: () => set({ pendingDiarySend: null }),
+
   reset: () => {
     set({
       selectedCharacterId: null,
@@ -476,6 +514,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       charPreviews: {},
       unreadByCharacter: {},
       hasMoreMessages: false,
+      pendingDiarySend: null,
     });
   },
 }));

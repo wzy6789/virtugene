@@ -105,6 +105,20 @@ interface VirtuGeneAPI {
       history: { role: string; content: string }[];
     }) => Promise<{ summary?: string; error?: string }>;
   };
+  diary: {
+    assist: (params: {
+      apiKey: string;
+      mode: 'polish' | 'continue' | 'extract' | 'guide' | 'auto' | 'compile' | 'combine' | 'review' | 'annual';
+      text: string;
+      context?: string;
+    }) => Promise<{ text?: string; title?: string; tags?: string[]; error?: string }>;
+    exportTxt: (entries: { title: string; date: string; content: string }[]) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;
+    exportDocx: (entries: { title: string; date: string; content: string }[]) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;
+    exportPdf: (html: string) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;
+    exportJson: (diaries: unknown[]) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;
+    importJson: () => Promise<{ ok?: boolean; canceled?: boolean; diaries?: unknown[]; error?: string }>;
+    exportMarkdown: (diaries: { date: string; title: string; content: string; mood?: number; tags?: string[] }[]) => Promise<{ ok?: boolean; canceled?: boolean; filePath?: string }>;
+  };
   window: {
     minimize: () => void;
     maximize: () => void;
@@ -113,6 +127,7 @@ interface VirtuGeneAPI {
   };
   app: {
     getVersion: () => Promise<string>;
+    notify: (title: string, body: string) => Promise<boolean>;
   };
   clipboard: {
     writeText: (text: string) => Promise<boolean>;

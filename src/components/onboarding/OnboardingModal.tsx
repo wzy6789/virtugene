@@ -73,6 +73,8 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="dna-bg glass-card w-[380px] rounded-3xl border-gene-purple/30 p-8 animate-fade-in relative overflow-hidden">
+        {/* 顶部品牌光带 */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-cyan/70 to-transparent" />
         {/* DNA 光晕装饰 */}
         <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-gene-purple/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-life-cyan/15 blur-3xl pointer-events-none" />
@@ -97,13 +99,21 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
           {recommended && (
             <div className="rounded-2xl border border-line bg-surface/60 p-4 mb-5 flex items-center gap-3">
               {recommended.avatar.startsWith('data:') ? (
-                <img
-                  src={recommended.avatar}
-                  alt={recommended.name}
-                  className="w-12 h-12 rounded-xl object-cover shrink-0"
-                />
+                <div className="relative shrink-0">
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-gene-purple to-life-cyan opacity-40 blur-[3px]" />
+                  <img
+                    src={recommended.avatar}
+                    alt={recommended.name}
+                    className="relative w-12 h-12 rounded-xl object-cover ring-1 ring-gene-purple/20"
+                  />
+                </div>
               ) : (
-                <span className="text-4xl shrink-0">{recommended.avatar}</span>
+                <div className="relative shrink-0">
+                  <div className="absolute inset-0 rounded-xl bg-gene-purple/30 blur-[3px]" />
+                  <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-[#2A2A48] to-[#0A0A14] flex items-center justify-center text-2xl ring-1 ring-gene-purple/30">
+                    {recommended.avatar}
+                  </div>
+                </div>
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">

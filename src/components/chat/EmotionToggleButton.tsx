@@ -16,6 +16,7 @@ function getValenceColor(valence?: number) {
 export function EmotionToggleButton({ isOpen, hasData, valence, onClick }: Props) {
   return (
     <button
+      id="guide-emotion"
       onClick={onClick}
       title="情绪图谱"
       className={`relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${

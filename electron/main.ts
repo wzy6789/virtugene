@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, clipboard, Notification } from 'electron';
 import path from 'path';
 import { registerKeyIPC } from './ipc/key';
 import { registerShellIPC } from './ipc/shell';
@@ -9,6 +9,7 @@ import { registerProactiveIPC } from './ipc/proactive';
 import { registerMemoryIPC } from './ipc/memory';
 import { registerEmotionIPC } from './ipc/emotion';
 import { registerContextIPC } from './ipc/context';
+import { registerDiaryIPC } from './ipc/diary';
 import { registerUpdater } from './updater';
 
 const isDev = !app.isPackaged;
@@ -64,6 +65,7 @@ app.whenReady().then(() => {
   registerMemoryIPC();
   registerEmotionIPC();
   registerContextIPC();
+  registerDiaryIPC();
 
   const win = createWindow();
 
@@ -92,6 +94,15 @@ app.whenReady().then(() => {
   ipcMain.handle('clipboard:writeText', (_event, { text }: { text: string }) => {
     clipboard.writeText(text);
     return true;
+  });
+
+  // 系统通知（用于每日写日记提醒等）
+  ipcMain.handle('app:notify', (_event, { title, body }: { title: string; body: string }) => {
+    if (Notification.isSupported()) {
+      new Notification({ title, body, silent: false }).show();
+      return true;
+    }
+    return false;
   });
 
   ipcMain.on('window:minimize', () => win.minimize());

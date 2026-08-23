@@ -4,8 +4,10 @@ import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
 import { useChatStore } from '../../store/chat-store';
 import { useCharacterStateStore } from '../../store/character-state-store';
 import { useEmotionStore } from '../../store/emotion-store';
+import { useUIStore } from '../../store/ui-store';
 import { ipc } from '../../lib/ipc-client';
 import { useRipple } from '../../lib/ripple';
+import { resetDiaryUnlock } from '../../lib/diary-unlock';
 import { CharacterList } from '../character/CharacterList';
 import { CharacterAddModal } from '../character/CharacterAddModal';
 import { SettingsPanel } from '../settings/SettingsPanel';
@@ -30,6 +32,8 @@ export function Sidebar() {
   const { theme, toggle } = useThemeStore();
   const logout = useAuthStore((s) => s.logout);
   const avatar = useAuthStore((s) => s.avatar) ?? DEFAULT_USER_AVATAR;
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
   const ripple = useRipple();
   const { width, setWidth, isDragging, startDrag } = useResizable({
     initial: SIDEBAR_DEFAULT,
@@ -53,6 +57,8 @@ export function Sidebar() {
     useChatStore.getState().reset();
     useCharacterStateStore.getState().clear();
     useEmotionStore.getState().clearCurrent();
+    // 手账隐私锁：换账号后必须重新解锁
+    resetDiaryUnlock();
     logout();
   };
 
@@ -79,6 +85,15 @@ export function Sidebar() {
           </button>
           <button onClick={() => setShowSettings(true)} title="设置" className={RAIL_BTN} onPointerDown={ripple.onPointerDown}>
             ⚙️
+          </button>
+          <button
+            id="guide-diary"
+            onClick={() => setActiveView(activeView === 'diary' ? 'chat' : 'diary')}
+            title="我的手账（日记）"
+            className={`${RAIL_BTN} ${activeView === 'diary' ? 'text-gene-purple bg-gene-purple/15 shadow-[0_0_10px_rgba(108,92,231,0.3)]' : ''}`}
+            onPointerDown={ripple.onPointerDown}
+          >
+            📓
           </button>
           <button onClick={toggle} title="切换主题" className={RAIL_BTN} onPointerDown={ripple.onPointerDown}>
             {theme === 'dark' ? '🌙' : '☀️'}
@@ -116,6 +131,7 @@ export function Sidebar() {
           {/* 基因实验室入口 —— 放在「搜索基因」上方（常驻青色微光） */}
           <div className="px-3 pt-2 pb-1 shrink-0">
             <button
+              id="guide-genelab"
               onClick={() => setShowAddModal(true)}
               onPointerDown={ripple.onPointerDown}
               className="ripple-host w-full flex items-center gap-3 rounded-xl border border-dashed border-life-cyan/40 text-life-cyan hover:bg-life-cyan/10 hover:border-life-cyan/70 hover:shadow-[0_2px_18px_rgba(0,206,201,0.28)] transition-all px-3 py-2 shadow-[0_0_10px_rgba(0,206,201,0.12)]"

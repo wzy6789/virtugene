@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useAuthStore } from './store/auth-store';
 import { useThemeStore } from './store/theme-store';
 import { ipc } from './lib/ipc-client';
@@ -8,12 +8,19 @@ import { MainLayout } from './components/layout/MainLayout';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { UpdateNotesModal } from './components/update/UpdateNotesModal';
 import { OnboardingGuide } from './components/onboarding/OnboardingGuide';
+import { useUIStore } from './store/ui-store';
+import { useSettingsStore } from './store/settings-store';
+import { diaryRepo, todayStr } from './db/diary-repo';
 import { getChangelog, LAST_SEEN_VERSION_KEY } from './lib/changelog';
 import { initSeedCharacters } from './lib/seed-init';
+
+// 手账按需加载：首次进入才拉取日记相关代码，加快主聊天页启动
+const DiaryPage = lazy(() => import('./pages/DiaryPage').then((m) => ({ default: m.DiaryPage })));
 
 export default function App() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const theme = useThemeStore((s) => s.theme);
+  const activeView = useUIStore((s) => s.activeView);
   const didResize = useRef(false);
   const [ready, setReady] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
@@ -59,6 +66,32 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
+  // 每日写日记提醒：到达设定时间且今天还没写 → 系统通知（每天最多一次）
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const KEY = 'virtugene-diary-reminder-last';
+    const check = () => {
+      const { diaryReminderEnabled, diaryReminderTime } = useSettingsStore.getState();
+      if (!diaryReminderEnabled) return;
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const today = todayStr();
+      if (`${hh}:${mm}` !== diaryReminderTime) return;
+      if (localStorage.getItem(KEY) === today) return;
+      // 今天已写过日记 → 不提醒
+      const userId = useAuthStore.getState().userId ?? '';
+      diaryRepo.getByDate(userId, today).then((list) => {
+        if (list.length > 0) return;
+        void ipc.app.notify('📓 我的手账', '今天还没有写日记，要不要记下点什么？');
+        localStorage.setItem(KEY, today);
+      });
+    };
+    check();
+    const timer = setInterval(check, 30_000);
+    return () => clearInterval(timer);
+  }, [isLoggedIn]);
+
   const handleCloseUpdateNotes = () => {
     if (updateNotes) {
       localStorage.setItem(LAST_SEEN_VERSION_KEY, updateNotes.version);
@@ -78,7 +111,9 @@ export default function App() {
     <div className="h-full w-full bg-app text-ink">
       {isLoggedIn ? (
         <MainLayout>
-          <ChatPage />
+          <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-sm text-gray-500">正在唤醒手账…</div>}>
+            {activeView === 'chat' ? <ChatPage /> : <DiaryPage />}
+          </Suspense>
         </MainLayout>
       ) : (
         <AuthPage />

@@ -8,6 +8,7 @@ import { useUpdateStore } from '../../store/update-store';
 import { userRepo } from '../../db/user-repo';
 import { encryptApiKey, verifyPassword } from '../../lib/crypto';
 import { ipc } from '../../lib/ipc-client';
+import { resetDiaryUnlock } from '../../lib/diary-unlock';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -121,6 +122,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     await deleteAccount();
     useCharacterStateStore.getState().clear();
     useEmotionStore.getState().clearCurrent();
+    resetDiaryUnlock();
     localStorage.clear();
     logout();
     setIsDeleting(false);

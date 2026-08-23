@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useChatStore } from '../../store/chat-store';
 import { useAuthStore, DEFAULT_USER_AVATAR } from '../../store/auth-store';
 import { useEmotionStore } from '../../store/emotion-store';
+import { useSettingsStore } from '../../store/settings-store';
 import { MessageBubble } from './MessageBubble';
 import { Avatar } from '../ui/Avatar';
 import { ChatInput } from './ChatInput';
@@ -12,10 +13,12 @@ import { messageRepo } from '../../db/message-repo';
 import { sessionRepo } from '../../db/session-repo';
 import { memoryRepo } from '../../db/memory-repo';
 import { emotionRepo } from '../../db/emotion-repo';
+import { diaryRepo, todayStr } from '../../db/diary-repo';
 import { stateRepo } from '../../db/state-repo';
 import { ipc } from '../../lib/ipc-client';
 import { buildTimeContext, buildRelationshipContext, buildUserEmotionContext } from '../../lib/chat-context';
 import { checkReplyQuality } from '../../lib/reply-quality';
+import { DIARY_MOODS } from '../../lib/diary-utils';
 import { useNotificationStore } from '../../store/notification-store';
 import type { Message } from '../../db/index';
 
@@ -47,6 +50,62 @@ function formatTimeLabel(ts: number): string {
 
 interface ChatWindowProps {
   emotionToggle?: React.ReactNode;
+}
+
+/** 每日快速心情打卡：一键把今天的心情写进手账（不写正文） */
+function MoodCheckIn() {
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const checkIn = async (mood: number) => {
+    const userId = useAuthStore.getState().userId ?? '';
+    const today = todayStr();
+    try {
+      const list = await diaryRepo.getByDate(userId, today);
+      if (list.length > 0) {
+        await diaryRepo.update(list[0].id, { mood });
+      } else {
+        await diaryRepo.create({ userId, date: today, title: '', content: '', mood, tags: ['心情打卡'] });
+      }
+      setOpen(false);
+      setDone(true);
+      setTimeout(() => setDone(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="记录今天的心情"
+        className="px-2 py-1.5 rounded-lg text-sm text-gray-400 hover:bg-surface hover:text-ink transition-colors"
+      >
+        {done ? '✅ 已打卡' : '😊 打卡'}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] px-3 py-2.5 glass-card rounded-xl shadow-xl animate-fade-in">
+            <p className="text-[10px] text-gray-400 mb-1.5">今天的心情</p>
+            <div className="flex items-center gap-1.5">
+              {DIARY_MOODS.map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => void checkIn(m.value)}
+                  title={m.label}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-lg hover:bg-surface transition-all hover:scale-110"
+                >
+                  {m.emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function ChatWindow({ emotionToggle }: ChatWindowProps) {
@@ -237,6 +296,40 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
     const latestSnapshot = await emotionRepo.getLatest(sessionId);
     const userEmotionContext = buildUserEmotionContext(latestSnapshot?.userEmotion);
 
+    // 日记心情联动：今天日记记下低落/开心 → 影响回复语气（读取失败不影响发送）
+    let diaryMoodContext = '';
+    try {
+      const todayDiary = await diaryRepo.getByDate(userId, todayStr());
+      if (todayDiary.length > 0) {
+        const avg = todayDiary.reduce((s, d) => s + (d.mood ?? 3), 0) / todayDiary.length;
+        if (avg <= 2) {
+          diaryMoodContext = '\n\n[补充] 用户今天在日记里记下了低落的心情。你的回应要更体贴、更耐心，先安抚情绪。';
+        } else if (avg >= 4) {
+          diaryMoodContext = '\n\n[补充] 用户今天在日记里记下了不错的心情。你的回应可以更轻快、更有活力。';
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // 角色可见日记（默认关闭）：开启后注入最近日记片段，角色可自然提及
+    let diaryShareContext = '';
+    if (useSettingsStore.getState().diarySharedWithCharacters) {
+      try {
+        const recentDiaries = (await diaryRepo.getByUser(userId))
+          .filter((d) => d.content.trim().length > 0)
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 5);
+        if (recentDiaries.length > 0) {
+          diaryShareContext =
+            '\n\n[用户的日记（角色可见已开启，可自然提及，但不要生硬复述）]\n' +
+            recentDiaries.map((d) => `【${d.date}】${d.title ? `《${d.title}》` : ''}\n${d.content.slice(0, 200)}`).join('\n\n');
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     // 长会话滚动摘要：早期对话压缩，角色不用逐条回忆
     const sessionData = await sessionRepo.getById(sessionId);
     const summaryContext = sessionData?.summary
@@ -244,7 +337,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       : '';
 
     const enrichedPrompt =
-      character.systemPrompt + memoryContext + timeContext + relationshipContext + userEmotionContext + summaryContext;
+      character.systemPrompt + memoryContext + timeContext + relationshipContext + userEmotionContext + diaryMoodContext + diaryShareContext + summaryContext;
 
     // 动态温度：按角色主动倾向微调——高冷/疏离用低温度（更克制稳定），活泼/话痨用高温度（更跳脱）
     const temperature = 0.6 + (character.proactivity ?? 0.5) * 0.3;
@@ -369,6 +462,25 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
     }
   };
 
+  // 「把日记发给角色」：日记文本已作为用户消息落库（shareDiaryToCharacter），
+  // 这里在当前会话匹配时触发 AI 回复管线，然后消费掉标记。
+  const pendingDiarySend = useChatStore((s) => s.pendingDiarySend);
+  const consumeDiarySend = useChatStore((s) => s.consumeDiarySend);
+  useEffect(() => {
+    if (!pendingDiarySend) return;
+    const { sessionId, text } = pendingDiarySend;
+    if (sessionId !== currentSessionId) return;
+    const userMsg = messages.find((m) => m.sessionId === sessionId && m.role === 'user' && m.content === text);
+    if (!userMsg) return;
+    consumeDiarySend();
+    // 下一帧再触发，让消息先渲染上屏
+    const t = setTimeout(() => {
+      void performSend(text, text, userMsg);
+    }, 80);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDiarySend, currentSessionId]);
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -386,6 +498,7 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
         )}
         <div className="flex-1" />
         {emotionToggle}
+        <MoodCheckIn />
       </div>
 
       {/* Messages — click anywhere to focus input, like WeChat。

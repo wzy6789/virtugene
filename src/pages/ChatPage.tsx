@@ -55,7 +55,7 @@ function SettleToast() {
 
   if (!notice) return null;
   return (
-    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[65] pointer-events-none animate-cloud-in glass-card rounded-full px-4 py-1.5 text-xs text-ink shadow-lg flex items-center gap-1.5">
+    <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[65] pointer-events-none animate-cloud-in glass-card rounded-full px-4 py-1.5 text-xs text-ink shadow-lg flex items-center gap-1.5">
       <span>🧬</span>
       <span>{notice}</span>
     </div>
