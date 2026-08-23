@@ -9,7 +9,7 @@ export default defineConfig({
   root: '.',
   base: './',
   define: {
-    // 注入应用版本号（webApi.app.getVersion 使用；Electron 走 app.getVersion）
+    // 注入应用版本号（src/lib/sync.ts 等使用；Electron 运行时版本走 app.getVersion）
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   build: {
@@ -19,7 +19,5 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    // 允许局域网设备（手机）通过开发服务器预览
-    host: true,
   },
 });

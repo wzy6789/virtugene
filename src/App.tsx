@@ -10,6 +10,7 @@ import { UpdateNotesModal } from './components/update/UpdateNotesModal';
 import { OnboardingGuide } from './components/onboarding/OnboardingGuide';
 import { useUIStore } from './store/ui-store';
 import { useSettingsStore } from './store/settings-store';
+import { useDesktopSyncStore } from './store/desktop-sync-store';
 import { diaryRepo, todayStr } from './db/diary-repo';
 import { getChangelog, LAST_SEEN_VERSION_KEY } from './lib/changelog';
 import { initSeedCharacters } from './lib/seed-init';
@@ -29,6 +30,13 @@ export default function App() {
   useEffect(() => {
     initSeedCharacters().finally(() => setReady(true));
   }, []);
+
+  // 桌面端：初始化局域网同步服务端（监听手机推送 + 快照保鲜；登录后才有数据）
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const off = useDesktopSyncStore.getState().init();
+    return off;
+  }, [isLoggedIn]);
 
   // Splash 淡出过渡：ready 后先淡出再卸载
   useEffect(() => {

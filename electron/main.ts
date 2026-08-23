@@ -10,6 +10,7 @@ import { registerMemoryIPC } from './ipc/memory';
 import { registerEmotionIPC } from './ipc/emotion';
 import { registerContextIPC } from './ipc/context';
 import { registerDiaryIPC } from './ipc/diary';
+import { registerSyncIPC } from './ipc/sync';
 import { registerUpdater } from './updater';
 
 const isDev = !app.isPackaged;
@@ -66,6 +67,7 @@ app.whenReady().then(() => {
   registerEmotionIPC();
   registerContextIPC();
   registerDiaryIPC();
+  registerSyncIPC();
 
   const win = createWindow();
 

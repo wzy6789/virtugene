@@ -117,6 +117,20 @@ contextBridge.exposeInMainWorld('virtugene', {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     notify: (title: string, body: string) => ipcRenderer.invoke('app:notify', { title, body }),
   },
+  sync: {
+    start: (port?: number) => ipcRenderer.invoke('sync:start', { port }),
+    stop: () => ipcRenderer.invoke('sync:stop'),
+    status: () => ipcRenderer.invoke('sync:status'),
+    setExportData: (data: unknown) => ipcRenderer.invoke('sync:setExportData', { data }),
+    importResult: (reqId: string, ok: boolean, error?: string) =>
+      ipcRenderer.invoke('sync:importResult', { reqId, ok, error }),
+    /** 监听手机推送的导入请求（主进程转发） */
+    onImportRequest: (callback: (payload: { reqId: string; data: unknown }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: { reqId: string; data: unknown }) => callback(payload);
+      ipcRenderer.on('sync:import-request', handler);
+      return () => ipcRenderer.removeListener('sync:import-request', handler);
+    },
+  },
   clipboard: {
     writeText: (text: string) => ipcRenderer.invoke('clipboard:writeText', { text }),
   },

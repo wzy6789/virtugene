@@ -132,6 +132,14 @@ interface VirtuGeneAPI {
     getVersion: () => Promise<string>;
     notify: (title: string, body: string) => Promise<boolean>;
   };
+  sync: {
+    start: (port?: number) => Promise<{ ok: boolean; port?: number; url?: string; addresses?: string[]; error?: string }>;
+    stop: () => Promise<{ ok: boolean }>;
+    status: () => Promise<{ running: boolean; port: number; url: string; addresses: string[] }>;
+    setExportData: (data: unknown) => Promise<{ ok: boolean }>;
+    importResult: (reqId: string, ok: boolean, error?: string) => Promise<{ ok: boolean }>;
+    onImportRequest: (callback: (payload: { reqId: string; data: unknown }) => void) => () => void;
+  };
   clipboard: {
     writeText: (text: string) => Promise<boolean>;
   };

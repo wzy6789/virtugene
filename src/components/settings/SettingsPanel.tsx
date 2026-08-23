@@ -9,8 +9,8 @@ import { userRepo } from '../../db/user-repo';
 import { encryptApiKey, verifyPassword } from '../../lib/crypto';
 import { ipc } from '../../lib/ipc-client';
 import { resetDiaryUnlock } from '../../lib/diary-unlock';
-import { SyncSection } from './SyncSection';
-import { IS_ELECTRON, IS_MOBILE } from '../../lib/platform';
+import { DesktopSyncSection } from './DesktopSyncSection';
+import { IS_ELECTRON } from '../../lib/platform';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -214,8 +214,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             </div>
           </div>
 
-          {/* 局域网同步：手机端作为客户端直连桌面端同步服务 */}
-          {IS_MOBILE && <SyncSection />}
+          {/* 局域网同步：桌面端作为服务端供手机连接 */}
+          {IS_ELECTRON && <DesktopSyncSection />}
 
           {/* App update（仅桌面端支持自动更新） */}
           {IS_ELECTRON && (
