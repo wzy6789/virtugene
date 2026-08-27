@@ -32,6 +32,8 @@ export interface Character {
   sourcePresetId?: string;
   /** 是否置顶（侧边栏会话列表，仅用户自有角色使用） */
   pinned?: boolean;
+  /** TTS 声线（创建/首次聊天时由 AI 判定并固定） */
+  voice?: { voice: string; band?: 'male-deep' | 'male-mature' | 'male-young' | 'female-soft' | 'female-bright' | 'female-clear'; sid?: number; rate: string; pitch: string };
 }
 
 export interface RelationMilestone {

@@ -298,3 +298,10 @@ body {
   animation: cloudShine 3.6s ease-in-out infinite;
   pointer-events: none;
 }
+
+/* 聊天气泡字号 / 间距调节（data-chat-size / data-chat-density 由设置驱动） */
+.chat-scale[data-chat-size='12'] .text-sm { font-size: 12px; }
+.chat-scale[data-chat-size='16'] .text-sm { font-size: 16px; }
+.chat-scale[data-chat-density='0'] .group { margin-bottom: 2px; }
+.chat-scale[data-chat-density='2'] .group { margin-bottom: 22px; }
+

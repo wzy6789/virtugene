@@ -127,10 +127,13 @@ interface VirtuGeneAPI {
     maximize: () => void;
     close: () => void;
     setSize: (width: number, height: number) => Promise<boolean>;
+    setCloseToTray: (enabled: boolean) => Promise<boolean>;
+    setUnreadTotal: (total: number) => Promise<boolean>;
+    onFocusSession: (callback: (sessionId: string) => void) => () => void;
   };
   app: {
     getVersion: () => Promise<string>;
-    notify: (title: string, body: string) => Promise<boolean>;
+    notify: (title: string, body: string, sessionId?: string) => Promise<boolean>;
   };
   sync: {
     start: (port?: number) => Promise<{ ok: boolean; port?: number; url?: string; addresses?: string[]; error?: string }>;
@@ -139,6 +142,17 @@ interface VirtuGeneAPI {
     setExportData: (data: unknown) => Promise<{ ok: boolean }>;
     importResult: (reqId: string, ok: boolean, error?: string) => Promise<{ ok: boolean }>;
     onImportRequest: (callback: (payload: { reqId: string; data: unknown }) => void) => () => void;
+  };
+  tts: {
+    synth: (params: { text: string; voice: string; sid?: number; rate?: string; pitch?: string }) => Promise<{ ok: boolean; audio?: string; engine?: 'edge' | 'local'; filePath?: string | null; error?: string }>;
+    cacheDir: () => Promise<{ dir: string }>;
+    clearCache: () => Promise<{ ok: boolean; freed?: string }>;
+    modelStatus: () => Promise<{ installed: boolean; sizeMB: number; dir: string }>;
+    modelDownload: () => Promise<{ ok: boolean; error?: string }>;
+    modelRemove: () => Promise<{ ok: boolean }>;
+  };
+  voice: {
+    assign: (params: { apiKey: string; characterId: string; character: { name: string; systemPrompt: string; tags?: string[] }; userHint?: string }) => Promise<{ voice?: { voice: string; band?: string; sid?: number; rate: string; pitch: string }; error?: string; detail?: string }>;
   };
   clipboard: {
     writeText: (text: string) => Promise<boolean>;

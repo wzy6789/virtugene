@@ -9,6 +9,7 @@ import { SplashScreen } from './components/splash/SplashScreen';
 import { UpdateNotesModal } from './components/update/UpdateNotesModal';
 import { OnboardingGuide } from './components/onboarding/OnboardingGuide';
 import { useUIStore } from './store/ui-store';
+import { useChatStore } from './store/chat-store';
 import { useSettingsStore } from './store/settings-store';
 import { useDesktopSyncStore } from './store/desktop-sync-store';
 import { diaryRepo, todayStr } from './db/diary-repo';
@@ -36,6 +37,33 @@ export default function App() {
     if (!isLoggedIn) return;
     const off = useDesktopSyncStore.getState().init();
     return off;
+  }, [isLoggedIn]);
+
+  // 桌面端：关闭到托盘 + 系统通知点击直达会话
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    ipc.window.setCloseToTray(true);
+    const offFocus = ipc.window.onFocusSession((sessionId) => {
+      // 通知点击 → 切到聊天视图并选中对应角色会话
+      useUIStore.getState().setActiveView('chat');
+      void useChatStore.getState().selectSession(sessionId);
+    });
+    return offFocus;
+  }, [isLoggedIn]);
+
+  // 桌面端：未读总数上报（托盘菜单红点）
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const unsub = useChatStore.subscribe((s, prev) => {
+      if (s.unreadByCharacter !== prev.unreadByCharacter) {
+        const total = Object.values(s.unreadByCharacter).reduce((a, b) => a + (b ?? 0), 0);
+        void ipc.window.setUnreadTotal(total);
+      }
+    });
+    // 初始上报一次
+    const total = Object.values(useChatStore.getState().unreadByCharacter).reduce((a, b) => a + (b ?? 0), 0);
+    void ipc.window.setUnreadTotal(total);
+    return unsub;
   }, [isLoggedIn]);
 
   // Splash 淡出过渡：ready 后先淡出再卸载

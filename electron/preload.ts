@@ -112,10 +112,17 @@ contextBridge.exposeInMainWorld('virtugene', {
     maximize: () => ipcRenderer.send('window:maximize'),
     close: () => ipcRenderer.send('window:close'),
     setSize: (width: number, height: number) => ipcRenderer.invoke('window:setSize', { width, height }),
+    setCloseToTray: (enabled: boolean) => ipcRenderer.invoke('window:setCloseToTray', { enabled }),
+    setUnreadTotal: (total: number) => ipcRenderer.invoke('app:setUnreadTotal', { total }),
+    onFocusSession: (callback: (sessionId: string) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, { sessionId }: { sessionId: string }) => callback(sessionId);
+      ipcRenderer.on('app:focus-session', handler);
+      return () => ipcRenderer.removeListener('app:focus-session', handler);
+    },
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
-    notify: (title: string, body: string) => ipcRenderer.invoke('app:notify', { title, body }),
+    notify: (title: string, body: string, sessionId?: string) => ipcRenderer.invoke('app:notify', { title, body, sessionId }),
   },
   sync: {
     start: (port?: number) => ipcRenderer.invoke('sync:start', { port }),
@@ -130,6 +137,19 @@ contextBridge.exposeInMainWorld('virtugene', {
       ipcRenderer.on('sync:import-request', handler);
       return () => ipcRenderer.removeListener('sync:import-request', handler);
     },
+  },
+  tts: {
+    synth: (params: { text: string; voice: string; sid?: number; rate?: string; pitch?: string }) =>
+      ipcRenderer.invoke('tts:synth', params),
+    cacheDir: () => ipcRenderer.invoke('tts:cacheDir'),
+    clearCache: () => ipcRenderer.invoke('tts:clearCache'),
+    modelStatus: () => ipcRenderer.invoke('tts:modelStatus'),
+    modelDownload: () => ipcRenderer.invoke('tts:modelDownload'),
+    modelRemove: () => ipcRenderer.invoke('tts:modelRemove'),
+  },
+  voice: {
+    assign: (params: { apiKey: string; characterId: string; character: { name: string; systemPrompt: string; tags?: string[] }; userHint?: string }) =>
+      ipcRenderer.invoke('voice:assign', params),
   },
   clipboard: {
     writeText: (text: string) => ipcRenderer.invoke('clipboard:writeText', { text }),

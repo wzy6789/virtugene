@@ -19,7 +19,9 @@ import { ipc } from '../../lib/ipc-client';
 import { buildTimeContext, buildRelationshipContext, buildUserEmotionContext } from '../../lib/chat-context';
 import { checkReplyQuality } from '../../lib/reply-quality';
 import { DIARY_MOODS } from '../../lib/diary-utils';
+import { useTTS } from '../../lib/tts';
 import { useNotificationStore } from '../../store/notification-store';
+import { ConversationSettings } from './ConversationSettings';
 import type { Message } from '../../db/index';
 
 const FIVE_MINUTES = 5 * 60 * 1000;
@@ -109,6 +111,8 @@ function MoodCheckIn() {
 }
 
 export function ChatWindow({ emotionToggle }: ChatWindowProps) {
+  const chatFontSize = useSettingsStore((s) => s.chatFontSize);
+  const chatDensity = useSettingsStore((s) => s.chatDensity);
   const messages = useChatStore((s) => s.messages);
   const currentSessionId = useChatStore((s) => s.currentSessionId);
   const selectedCharacterId = useChatStore((s) => s.selectedCharacterId);
@@ -127,6 +131,30 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<ChatError>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  /** 会话内消息搜索 */
+  const [msgSearch, setMsgSearch] = useState('');
+  const [msgSearchOpen, setMsgSearchOpen] = useState(false);
+  /** TTS 朗读（用户主动点击才发声） */
+  const { speakingKey, busyKey, speak, stop } = useTTS();
+  const ttsEnabled = useSettingsStore((s) => s.ttsEnabled);
+  const ttsSpeed = useSettingsStore((s) => s.ttsSpeed);
+  const [convSettingsOpen, setConvSettingsOpen] = useState(false);
+
+  /** 朗读一条 AI 消息（使用角色声线；未分配则跳过） */
+  const handleSpeak = (m: Message) => {
+    if (!ttsEnabled) return;
+    if (speakingKey === m.id) {
+      stop();
+      return;
+    }
+    const voice = character?.voice;
+    if (!voice || !m.content.trim()) return;
+    // 全局语速倍率叠加到角色语速上（Edge-TTS 协议要求 rate 带 +/- 符号）
+    const baseRate = parseFloat(voice.rate) || 0;
+    const combined = Math.round(baseRate * ttsSpeed);
+    const rate = `${combined >= 0 ? '+' : ''}${combined}%`;
+    void speak(m.id, m.content.trim().slice(0, 800), voice.voice, rate, voice.pitch, voice.sid);
+  };
 
   const character = characters.find((c) => c.id === selectedCharacterId);
 
@@ -386,6 +414,15 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
         await messageRepo.markFailed(userMsg.id, true);
         updateMessage(userMsg.id, { failed: true });
       } else if (result.content) {
+        // 记录 AI 用量（本地估算）：prompt（system+history+message）+ 回复
+        try {
+          const { estimateTokens } = await import('../../store/settings-store');
+          const promptTokens = estimateTokens(enrichedPrompt + apiMessage + history.map((h) => h.content).join(''));
+          const replyTokens = estimateTokens(result.content);
+          useSettingsStore.getState().addAiTokens(promptTokens + replyTokens);
+        } catch {
+          /* ignore */
+        }
         // Split multi-message responses on "---"，逐条延迟发出，模拟真人打字
         const parts = result.content.split('---').map((p: string) => p.trim()).filter((p: string) => p.length > 0);
         for (let i = 0; i < parts.length; i++) {
@@ -497,13 +534,71 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
           </div>
         )}
         <div className="flex-1" />
+        {msgSearchOpen ? (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface border border-line-strong">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-gray-400 shrink-0">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              autoFocus
+              value={msgSearch}
+              onChange={(e) => setMsgSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { setMsgSearchOpen(false); setMsgSearch(''); }
+                if (e.key === 'Enter') {
+                  // 跳到第一条匹配
+                  const idx = messages.findIndex((m) => m.content.includes(msgSearch.trim()));
+                  if (idx >= 0) virtualizer.scrollToIndex(idx, { align: 'center' });
+                }
+              }}
+              placeholder="搜索本会话消息…"
+              className="w-40 bg-transparent text-xs text-ink placeholder:text-gray-500 outline-none"
+            />
+            <button
+              onClick={() => { setMsgSearchOpen(false); setMsgSearch(''); }}
+              className="text-gray-400 hover:text-ink text-xs shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setMsgSearchOpen(true)}
+            title="搜索本会话消息"
+            className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:bg-surface hover:text-ink transition-colors"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            </svg>
+          </button>
+        )}
         {emotionToggle}
         <MoodCheckIn />
+        <button
+          onClick={() => setConvSettingsOpen(true)}
+          title="对话设置"
+          className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:bg-surface hover:text-ink transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
       </div>
+
+      {/* 会话内搜索：匹配数提示 */}
+      {msgSearchOpen && msgSearch.trim() && (
+        <div className="px-4 py-1.5 text-[11px] text-gray-500 border-b border-line bg-surface/50 flex items-center justify-between">
+          <span>
+            找到 {messages.filter((m) => m.content.includes(msgSearch.trim())).length} 条匹配
+          </span>
+          <span className="text-gray-400">Enter 跳转第一条 · Esc 关闭</span>
+        </div>
+      )}
 
       {/* Messages — click anywhere to focus input, like WeChat。
           切换会话时淡入（key 触发重挂载 + 淡入动画，滚动位置由 scrollToLatest 接管） */}
-      <div key={currentSessionId} ref={scrollRef} className="animate-message-in flex-1 overflow-y-auto px-4 py-3" onClick={() => inputRef.current?.focus()}>
+      <div key={currentSessionId} ref={scrollRef} data-chat-size={chatFontSize} data-chat-density={chatDensity} className="animate-message-in flex-1 overflow-y-auto px-4 py-3 chat-scale" onClick={() => inputRef.current?.focus()}>
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <p className="text-xs text-gray-600">
@@ -556,6 +651,10 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
                     onQuote={setReplyingTo}
                     onDelete={(m) => void deleteMessage(m.id)}
                     onRetry={(m) => void handleRetry(m)}
+                    onSpeak={row.message.role === 'assistant' && ttsEnabled ? handleSpeak : undefined}
+                    speakKey={row.message.id}
+                    speakingKey={speakingKey}
+                    busyKey={busyKey}
                   />
                 </div>
               );
@@ -598,6 +697,8 @@ export function ChatWindow({ emotionToggle }: ChatWindowProps) {
       )}
 
       <ChatInput ref={inputRef} onSend={handleSend} disabled={sending} />
+
+      <ConversationSettings open={convSettingsOpen} onClose={() => setConvSettingsOpen(false)} />
     </div>
   );
 }

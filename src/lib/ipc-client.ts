@@ -48,6 +48,17 @@ const noop: VirtuGeneAPI = {
     importResult: async () => ({ ok: false }),
     onImportRequest: () => () => {},
   },
+  tts: {
+    synth: async () => ({ ok: false, error: '未在 Electron 环境中运行' }),
+    cacheDir: async () => ({ dir: '' }),
+    clearCache: async () => ({ ok: false }),
+    modelStatus: async () => ({ installed: false, sizeMB: 0, dir: '' }),
+    modelDownload: async () => ({ ok: false }),
+    modelRemove: async () => ({ ok: false }),
+  },
+  voice: {
+    assign: async () => ({ error: '未在 Electron 环境中运行' }),
+  },
   shell: {
     open: async () => false,
   },
@@ -56,6 +67,9 @@ const noop: VirtuGeneAPI = {
     maximize: () => {},
     close: () => {},
     setSize: async () => false,
+    setCloseToTray: async () => false,
+    setUnreadTotal: async () => false,
+    onFocusSession: () => () => {},
   },
   app: {
     getVersion: async () => '',

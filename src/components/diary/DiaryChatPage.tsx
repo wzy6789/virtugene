@@ -45,6 +45,8 @@ export function DiaryChatPage({ date, onBack }: Props) {
   const [stickToBottom, setStickToBottom] = useState(true);
   const [showNewHint, setShowNewHint] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  /** 专注模式：隐藏工具条，沉浸书写 */
+  const [focusMode, setFocusMode] = useState(false);
   const [exporting, setExporting] = useState(false);
   /** 段落编辑：正在编辑的段落下标 + 草稿文本 */
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
@@ -388,6 +390,19 @@ export function DiaryChatPage({ date, onBack }: Props) {
             >
               {viewMode === 'write' ? '📄 日记视图' : '💬 回到写作'}
             </button>
+
+            {/* 专注模式（隐藏工具条） */}
+            {viewMode === 'write' && (
+              <button
+                onClick={() => setFocusMode((v) => !v)}
+                title={focusMode ? '退出专注模式' : '专注模式：隐藏工具条'}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs transition-all border ${
+                  focusMode ? 'border-life-cyan/50 text-life-cyan bg-life-cyan/10' : 'border-line-strong text-sub hover:text-ink'
+                }`}
+              >
+                {focusMode ? '🎯 专注中' : '🧘 专注'}
+              </button>
+            )}
           </>
         )}
 
@@ -590,9 +605,11 @@ export function DiaryChatPage({ date, onBack }: Props) {
           )}
       </div>
 
-      {/* 工具条：心情 + 标签 + AI */}
+      {/* 工具条：心情 + 标签 + AI（专注模式隐藏；输入区始终显示） */}
       <div className="border-t border-line shrink-0">
         <div className="max-w-2xl mx-auto px-4 py-2 space-y-2">
+          {!focusMode && (
+          <>
           {/* 心情 + 标签 */}
           <div className="flex items-center gap-2 flex-wrap">
             {DIARY_MOODS.map((m) => (
@@ -679,6 +696,8 @@ export function DiaryChatPage({ date, onBack }: Props) {
               </button>
               <span className="text-[10px] text-gray-400">未关联角色：整理你的日记片段；关联角色：片段 + TA 的对话融合成一篇。基于片段时采纳会替换</span>
             </div>
+          )}
+          </>
           )}
 
           {/* 输入区 */}

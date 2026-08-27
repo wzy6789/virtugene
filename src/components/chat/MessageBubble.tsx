@@ -13,9 +13,14 @@ interface Props {
   onQuote?: (message: Message) => void;
   onDelete?: (message: Message) => void;
   onRetry?: (message: Message) => void;
+  /** TTS 播放（AI 消息）：传入则显示 🔊；speaking/busy 由父级传入 */
+  onSpeak?: (message: Message) => void;
+  speakKey?: string;
+  speakingKey?: string | null;
+  busyKey?: string | null;
 }
 
-export function MessageBubble({ message, avatar, animate, isLatest, onQuote, onDelete, onRetry }: Props) {
+export function MessageBubble({ message, avatar, animate, isLatest, onQuote, onDelete, onRetry, onSpeak, speakKey, speakingKey, busyKey }: Props) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -84,12 +89,37 @@ export function MessageBubble({ message, avatar, animate, isLatest, onQuote, onD
           )}
           {message.content}
         </div>
+        {!isUser && onSpeak && (
+          <button
+            onClick={() => onSpeak(message)}
+            title={speakingKey === speakKey ? '停止朗读' : busyKey === speakKey ? '合成中…' : '朗读'}
+            className={`absolute top-0 ${
+              isUser ? 'right-full mr-1.5' : 'left-full ml-1.5'
+            } flex items-center justify-center w-6 h-6 rounded-md bg-panel border border-line text-gray-400 hover:text-ink transition-all opacity-0 group-hover:opacity-100 ${
+              speakingKey === speakKey || busyKey === speakKey ? 'opacity-100 !text-life-cyan' : ''
+            }`}
+          >
+            {speakingKey === speakKey ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : busyKey === speakKey ? (
+              <svg className="animate-spin" width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="20" />
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </svg>
+            )}
+          </button>
+        )}
         <button
           onClick={handleCopy}
           title={copied ? '已复制' : '复制'}
-          className={`absolute top-1.5 ${
-            isUser ? 'right-full mr-1.5' : 'left-full ml-1.5'
-          } flex items-center justify-center w-6 h-6 rounded-md bg-panel border border-line text-gray-400 hover:text-ink transition-all opacity-0 group-hover:opacity-100 ${
+          className={`absolute ${isUser ? 'top-1.5 right-full mr-1.5' : 'top-8 left-full ml-1.5'} flex items-center justify-center w-6 h-6 rounded-md bg-panel border border-line text-gray-400 hover:text-ink transition-all opacity-0 group-hover:opacity-100 ${
             copied ? 'opacity-100 !text-life-cyan' : ''
           }`}
         >

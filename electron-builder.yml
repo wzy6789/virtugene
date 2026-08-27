@@ -14,6 +14,14 @@ files:
   - dist-electron/**/*
   - dist/renderer/**/*
 
+# 原生 addon 必须解包到 asar 外，否则 require 无法加载 .node
+asarUnpack:
+  - node_modules/sherpa-onnx-node/**/*
+  - node_modules/sherpa-onnx-win-x64/**/*
+
+# sherpa-onnx 是 N-API prebuilt（无 binding.gyp），跳过 rebuild 防止覆盖已实测兼容的二进制
+npmRebuild: false
+
 publish:
   provider: github
   owner: wzy6789

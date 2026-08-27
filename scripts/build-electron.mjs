@@ -10,7 +10,12 @@ const mainConfig = {
   target: 'node20',
   format: 'cjs',
   outfile: 'dist-electron/main.cjs',
-  external: ['electron'],
+  external: [
+    'electron',
+    // 原生 addon（.node）无法 bundle，运行时从 node_modules 加载
+    'sherpa-onnx-node',
+    'sherpa-onnx-win-x64',
+  ],
 };
 
 /** @type {esbuild.BuildOptions} */

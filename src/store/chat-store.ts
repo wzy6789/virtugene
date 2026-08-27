@@ -8,9 +8,47 @@ import { stateRepo } from '../db/state-repo';
 import { useAuthStore } from './auth-store';
 import { useCharacterStateStore } from './character-state-store';
 import { deriveProactivity, GREETING_PROACTIVITY_THRESHOLD } from '../lib/personality';
+import { sanitizeVoiceProfile, completeVoiceProfile } from '../lib/voice-map';
 import { ipc } from '../lib/ipc-client';
 import { useNotificationStore } from './notification-store';
 import { useDiaryStore } from './diary-store';
+
+/** 角色声线：创建/首次进入时由 AI 按形象判定并固定（幂等，只执行一次） */
+async function assignVoiceIfNeeded(characterId: string, userId: string): Promise<void> {
+  try {
+    const apiKey = useAuthStore.getState().apiKey;
+    if (!apiKey) return;
+    const char = await characterRepo.getById(characterId);
+    if (!char) return;
+    if (char.voice) {
+      // 老数据迁移：已有声线但缺本地 sid → 补全（band 缺失时按 Edge 音色性别映射）
+      if (!Number.isInteger(char.voice.sid)) {
+        const v = completeVoiceProfile(char.voice, characterId);
+        await characterRepo.update(characterId, { voice: v });
+        useChatStore.setState((s) => ({
+          characters: s.characters.map((c) => (c.id === characterId ? { ...c, voice: v } : c)),
+        }));
+      }
+      return;
+    }
+    const r = await ipc.voice.assign({
+      apiKey,
+      characterId,
+      character: { name: char.name, systemPrompt: char.systemPrompt, tags: char.tags },
+    });
+    if (r.voice) {
+      const v = sanitizeVoiceProfile(r.voice);
+      const full = completeVoiceProfile(v, characterId);
+      await characterRepo.update(characterId, { voice: full });
+      // 同步内存中的角色
+      useChatStore.setState((s) => ({
+        characters: s.characters.map((c) => (c.id === characterId ? { ...c, voice: full } : c)),
+      }));
+    }
+  } catch {
+    /* 声线判定失败不影响聊天 */
+  }
+}
 
 interface CharPreview {
   content: string;
@@ -31,6 +69,8 @@ interface ChatState {
 
   loadCharacters: () => Promise<void>;
   selectCharacter: (id: string) => Promise<void>;
+  /** 按会话 id 切换到对应角色（系统通知点击直达用） */
+  selectSession: (sessionId: string) => Promise<void>;
   loadEarlierMessages: () => Promise<void>;
   addMessage: (msg: Message) => void;
   updateMessage: (id: string, patch: Partial<Message>) => void;
@@ -159,6 +199,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (existing.length === 0) {
       await seedGreeting(id, session.id);
     }
+    // 声线：角色还没有声线且配置了 Key → 首次进入时由 AI 按形象判定并固定（后台执行，不阻塞）
+    void assignVoiceIfNeeded(id, userId);
     // 只加载最近 MESSAGE_PAGE_SIZE 条，更早消息按需加载
     const msgs = await messageRepo.getPage(session.id, { limit: MESSAGE_PAGE_SIZE });
     const total = await messageRepo.countBySession(session.id);
@@ -174,6 +216,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: msgs,
       hasMoreMessages: total > msgs.length,
       unreadByCharacter: { ...unreadByCharacter },
+    });
+  },
+
+  selectSession: async (sessionId) => {
+    const userId = useAuthStore.getState().userId ?? '';
+    const session = await sessionRepo.getById(sessionId);
+    if (!session || session.userId !== userId) return;
+    // 找到会话归属角色并切换到该角色（通知点击直达）
+    const char = get().characters.find((c) => c.id === session.characterId);
+    if (char) {
+      await get().selectCharacter(char.id);
+      return;
+    }
+    // 角色不在当前列表（如刚同步过来）：直接加载该会话
+    const msgs = await messageRepo.getPage(session.id, { limit: MESSAGE_PAGE_SIZE });
+    const total = await messageRepo.countBySession(session.id);
+    await sessionRepo.clearUnread(session.id);
+    set({
+      currentSessionId: session.id,
+      messages: msgs,
+      hasMoreMessages: total > msgs.length,
     });
   },
 
@@ -260,6 +323,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           avatar: char.avatar,
           preview: content,
         });
+        // 窗口不在前台（最小化到托盘/切走）→ 弹系统通知，点击直达该会话
+        if (typeof document !== 'undefined' && document.hidden) {
+          void ipc.app.notify(char.name, content.slice(0, 60), session.id);
+        }
       }
     }
   },
@@ -369,6 +436,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await characterRepo.create(character);
     await get().loadCharacters();
     get().selectCharacter(character.id);
+    // 创建/克隆角色后立即由 AI 判定声线并固定（后台执行，幂等）
+    void assignVoiceIfNeeded(character.id, userId);
     return character;
   },
 
